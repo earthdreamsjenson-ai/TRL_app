@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "baseball-app-501615",
+  "private_key_id": "dc9e78c0491fd5a782d09bcea861040a596766b7",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCwr5ixm3wTpkTi\n9HHTsaUycE/uSCyvGRSZjKtYdfPz8AjPieFJO7I+RamrZH/65RlW9Vc4eWKZUCCC\n9b3/TIaffxqxd79F2w4jn+lLQQOM7HOSpZAzb+3loKjc82UHW0joAv9TRhpb46gG\neYhslpxAPHh8plKA2zh14rl20rUE+EJV4vn6yAOpIA1K7smz8TF3NdIEv+vKwaY7\nTqEhrckqnryCGJdIRl+LtTCmxrCZMVgq0FzXJPgsfIyIfDsdFMhbcSo+OXsJ/rRW\nQwp+2UvM1JRbURr/AAPjOGct817YTgKlPiuKrWlOOijEx6whvwuE57NJwiasZnmq\n3ePf4IoVAgMBAAECgf8G83PXiOr9SJ+Ru+eZ7HWBBnxnrJPMT7BI7HasqNK5RhOk\n8f6Ph5LXBOaVoLn6gFH+4vEwELsHKHtDhx5N2qKVyFgNo0z1YE1k9NNLEFYBIwMf\n1Bp8xvzL1QY9Yeg8Kv/FjqHGAFd22EcfZ80tCr/RxyGIoUudoZSExZ2GRgz9pP8O\neAhvhKK48/3xxyyid/tdzaTDOlVLqRqH0oqpm+CAn+z5IimJJ0N/dU+ghrIUMh5Y\n0X90i6phAnTSuPwYABM5dLixVvEPvJfS4ZSFIocHXq5k69nIzBmsc77alHOe4iFD\nA3K9kjDhDhFrBNfyHanhlQ/9PMLepP/TuNkmiCMCgYEA4jCLBhEVK3R/hSYovN53\n79EM7u/KM/Y4yeZ26Y7EnpdurRwBj1Tm4UNy4IrJuxIMFk69r6pFhjz1m/6tYz6R\nHmMXKAQktp3JbXZUl6pMtzGb3vJMfc+c0omma1tbv17PrIisdKj2unj9mWMjkt7o\nzLcUrFtAhA7+ESgNm54DnVcCgYEAx/jWlh0NoRGw3kQJ1sUg9fQ+a2R7dA7K+CeE\nLfhjn5MlLZdsjaK57NINEga1Ngj/jtg67thAO5IcX+keKpu3p+OXTITIujpI86Lb\nGo+JjqF2jDOTRHCeaI60uCF4QWm3g3HjhqrBgOTGEsqNG/ltyq4n+jiWgQdLDnQb\ntp3ghHMCgYEA3z7iOH6r0lQNeLGNC7zXy88dYMczX83phvz86NCMp6r3BczajUlT\nB4q224CgUw8g9vOIrNT2AeQw1mKrZ4TdXoyW0lwkkEl0AaIFJBxl03oXShkD/jjn\no7VQmC13hI5jkvrim9IYkzvPsZD0D4YLZ+JbeTInny/c+7n4lFuFXckCgYEAvZLA\nU4Ttc8Giq8NSlIFC8wf92K9kfay8bC6CF1Z/kzrapvMDXO5kVgb3jxw+1CAJrbB9\nhgoKMq8cKSyFhZ0jqYyP1WGYLTuuBxJfpjlnDYkyKk2Gkf41nieTWW+ZYmHHMFxa\nd0MPuJKo2A2fYmK+28LocUUOIPn6BJS75Q6cVtMCgYBbhwxjcejIwg1mgidTe1zC\nLxwT/5G5Iiw1NpMSlcnyut59PoDYnecyS0axG0/QC6QDjBoziOSoqmojYNgYw/rA\nH6UYnSJfz9xzmH6GAl4h5IPM6unQffAdrolg3aMmJSshJq46zTiLXgUZa5hr3mLB\nTtOG9OnTU8J9ihvZaNgn1w==\n-----END PRIVATE KEY-----\n",
+  "client_email": "streamlit-loader@baseball-app-501615.iam.gserviceaccount.com",
+  "client_id": "108768922844054343591",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/streamlit-loader%40baseball-app-501615.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
