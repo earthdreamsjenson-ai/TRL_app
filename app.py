@@ -129,7 +129,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📅 NG日登録", 
     "🛠️ グラウンド枠登録・日程作成", 
     "🏆 試合結果入力", 
-    "⚙️ マスタ・データ確認",
+    "⚙️ マスタメンテナンス・データ確認",
     "📊 残試合数確認"
 ])
 
@@ -555,20 +555,71 @@ with tab3:
                         st.success(f"不戦敗の結果を保存しました。（スコア: {final_score}）")
                         st.rerun()
 
-# --- タブ4: 各種マスタデータの確認 ---
+# --- タブ4: マスタメンテナンス・各種データの確認 ---
 with tab4:
-    st.header("⚙️ マスタ・データ確認")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("🏟️ グラウンドマスタ")
-        st.dataframe(grounds_df)
-        st.subheader("📋 確保グラウンド枠の全履歴 (`available_slots`)")
-        st.dataframe(slots_df)
-    with c2:
-        st.subheader("🏃 チームマスタ")
-        st.dataframe(teams_df)
-        st.subheader("🔥 残りの未消化試合プール")
-        st.dataframe(pool_df)
+    st.header("⚙️ マスタメンテナンス・データ確認")
+    
+    # マスタ管理用のサブタブを作成
+    m_tab1, m_tab2, m_tab3 = st.tabs(["🏟️ グラウンドマスタ編集", "🏃 チームマスタ編集", "📋 その他データ確認"])
+    
+    with m_tab1:
+        st.subheader("🏟️ グラウンドマスタのメンテナンス")
+        st.markdown(
+            "💡 **編集方法:** セルをダブルクリックして値を書き換えられます。\n"
+            "  * **行追加:** 表の最下行にある `+` を押すか、セルを選択して入力します。\n"
+            "  * **行削除:** 行の左側をチェックして、キーボードの `Delete` キーを押します。"
+        )
+        
+        # エディタの構成を定義して入力しやすくする
+        edited_grounds_df = st.data_editor(
+            grounds_df, 
+            num_rows="dynamic", 
+            use_container_width=True,
+            key="master_grounds_editor",
+            column_config={
+                "name": st.column_config.TextColumn("グラウンド名", required=True),
+                "is_far": st.column_config.CheckboxColumn("遠方フラグ"),
+                "maps_url": st.column_config.TextColumn("GoogleMap URL")
+            }
+        )
+        
+        if st.button("💾 グラウンドマスタの変更を保存する", type="primary", key="btn_save_grounds"):
+            conn.update(worksheet="grounds", data=edited_grounds_df)
+            st.cache_data.clear()
+            st.success("🎉 グラウンドマスタをスプレッドシートに保存しました！")
+            st.rerun()
+            
+    with m_tab2:
+        st.subheader("🏃 チームマスタのメンテナンス")
+        st.markdown(
+            "💡 **編集方法:** グラウンドマスタと同様に、セルの直接書き換え・行追加・削除が可能です。"
+        )
+        
+        edited_teams_df = st.data_editor(
+            teams_df,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="master_teams_editor",
+            column_config={
+                "team": st.column_config.TextColumn("チーム名", required=True),
+                "allow_far": st.column_config.CheckboxColumn("遠方対応可否")
+            }
+        )
+        
+        if st.button("💾 チームマスタの変更を保存する", type="primary", key="btn_save_teams"):
+            conn.update(worksheet="teams", data=edited_teams_df)
+            st.cache_data.clear()
+            st.success("🎉 チームマスタをスプレッドシートに保存しました！")
+            st.rerun()
+
+    with m_tab3:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("📋 確保グラウンド枠の全履歴 (`available_slots`)")
+            st.dataframe(slots_df, use_container_width=True)
+        with c2:
+            st.subheader("🔥 残りの未消化試合プール")
+            st.dataframe(pool_df, use_container_width=True)
 
 # --- タブ5: 各チームの残試合数確認【改良版】 ---
 with tab5:
