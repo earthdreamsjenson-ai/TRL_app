@@ -504,8 +504,8 @@ with tab3:
                         
                 elif status == "雨天中止":
                     if st.button("🚨 雨天中止を確定して再試合プールへ戻す", key=f"rain_{m_id}"):
-                        updated_sched_df = sched_df[sched_df['id'] != m_id]
-                        conn.update(worksheet="schedule", data=updated_sched_df)
+#                        updated_sched_df = sched_df[sched_df['id'] != m_id]
+#                        conn.update(worksheet="schedule", data=updated_sched_df)
                         
                         canceled_match = pd.DataFrame([{"team1": row['team1'], "team2": row['team2']}])
                         updated_pool_df = pd.concat([canceled_match, pool_df], ignore_index=True)
