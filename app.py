@@ -514,11 +514,11 @@ with tab3:
                         slots_df.loc[slots_df['id'] == m_id, 'status'] = '未割り当て'
                         conn.update(worksheet="available_slots", data=slots_df)
                         
-                        if current_status in ["通常消化", "不戦敗"]:
-                            updated_res_df = res_df[res_df['id'] != m_id]
-                        else:
-                            new_res = pd.DataFrame([{"id": m_id, "status": "雨天中止", "score": "-"}])
-                            updated_res_df = pd.concat([res_df[res_df['id'] != m_id], new_res], ignore_index=True)
+#                        if current_status in ["通常消化", "不戦敗"]:
+#                            updated_res_df = res_df[res_df['id'] != m_id]
+#                        else:
+                        new_res = pd.DataFrame([{"id": m_id, "status": "雨天中止", "score": ""}])
+                        updated_res_df = pd.concat([res_df[res_df['id'] != m_id], new_res], ignore_index=True)
                         
                         conn.update(worksheet="results", data=updated_res_df)
                         st.cache_data.clear()
