@@ -136,14 +136,12 @@ with tab1:
         select_team = st.selectbox("あなたのチーム名を選択してください", ["選択してください"] + all_teams)
     with col_t2:
         select_ng_date = st.date_input("試合NGにする日を選択")
-        # 【①改善】NG日の選択内容から対象年月（YYYY-MM形式）を自動取得
         target_month = str(select_ng_date)[:7]
         st.caption(f"対象月（自動取得）: **{target_month}**")
         
     if select_team != "選択してください":
         if st.button("💾 NG日を登録・上書きする", type="primary"):
             new_ng_row = pd.DataFrame([{"team": select_team, "year_month": target_month, "ng_date": str(select_ng_date)}])
-            # 【②改善】同チーム・同対象月の既存データを確実に削除（置き換え処理）
             filtered_ng = ng_df[~((ng_df['team'] == select_team) & (ng_df['year_month'] == target_month))]
             updated_ng_df = pd.concat([filtered_ng, new_ng_row], ignore_index=True)
             conn.update(worksheet="unavailable_days", data=updated_ng_df)
@@ -158,26 +156,20 @@ with tab1:
 with tab2:
     st.header("🛠️ グラウンド枠の管理と日程の自動生成")
     
-    # 2-1. グラウンド枠の一時保存フォーム（毎月10日頃の作業用）
+    # 2-1. グラウンド枠の一時保存フォーム
     st.subheader("① 確保したグラウンド枠の登録（随時保存可能）")
     with st.form("slot_input_form"):
         col_g1, col_g2, col_g3 = st.columns(3)
         slot_date = col_g1.date_input("確保した日付")
         slot_time = col_g2.selectbox("時間枠", [
-            "9:00-12:00",
-            "11:00-14:00",
-            "12:00-15:00",
-            "12:00-18:00",
-            "13:00-17:00",
-            "14:00-17:00",
-            "15:00-18:00"
+            "9:00-12:00", "11:00-14:00", "12:00-15:00", "12:00-18:00", "13:00-17:00", "14:00-17:00", "15:00-18:00"
         ])
         slot_ground = col_g3.selectbox("グラウンド名", ground_options)
         
         submit_slot = st.form_submit_button("💾 この枠をデータベースに保存する")
         if submit_slot:
             generated_id = f"S_{slot_date}_{slot_time}_{slot_ground}"
-            ym = str(slot_date)[:7] # YYYY-MM を抽出
+            ym = str(slot_date)[:7]
             
             new_slot_row = pd.DataFrame([{
                 "id": generated_id, "date": str(slot_date), "slot": slot_time,
@@ -193,7 +185,7 @@ with tab2:
 
     st.markdown("---")
     
-    # 2-2. 保存された枠を使った日程の自動作成（毎月15日の作業用）
+    # 2-2. 保存された枠を使った日程の自動作成
     st.subheader("② 次月の日程自動作成の実行")
     target_month_sched = st.selectbox("作成する対象月を選択", ["2026-07", "2026-08", "2026-09"], index=1, key="sb_month")
     
@@ -249,22 +241,38 @@ with tab3:
             m_id = row['id']
             existing_res = res_df[res_df['id'] == m_id]
             current_status = existing_res['status'].values[0] if not existing_res.empty else "未消化"
+            current_score = existing_res['score'].values[0] if not existing_res.empty else "-"
             
+            # ステータステキストの初期定義
+            status_display_text = f"現在のステータス: {current_status}"
+            
+            # ステータスに応じた「絵文字」「背景色・文字色」および【追加改善：詳細情報の可視化】
             if current_status == "通常消化":
                 status_emoji = "🟢"
-                bg_color = "#e6f4ea"
+                bg_color = "#e6f4ea"      # 黄緑
                 text_color = "#137333"
+                # 【改善】登録されているスコアを明記
+                status_display_text += f" (登録スコア: {current_score})"
+                
             elif current_status == "雨天中止":
                 status_emoji = "⚫"
-                bg_color = "#f1f3f4"
+                bg_color = "#f1f3f4"      # 灰色
                 text_color = "#5f6368"
+                
             elif current_status == "不戦敗":
                 status_emoji = "🟡"
-                bg_color = "#fef7e0"
+                bg_color = "#fef7e0"      # クリーム色
                 text_color = "#b06000"
+                # 【改善】スコアからどちらのチームが負けたかを自動判定して明記
+                if current_score == "0-10":
+                    status_display_text += f" (❌ 敗戦: {row['team1']} / ⭕ 不戦勝: {row['team2']})"
+                elif current_score == "10-0":
+                    status_display_text += f" (⭕ 不戦勝: {row['team1']} / ❌ 敗戦: {row['team2']})"
+                else:
+                    status_display_text += f" (スコア: {current_score})"
             else:
                 status_emoji = "⚪"
-                bg_color = "#e8f0fe"
+                bg_color = "#e8f0fe"      # 薄い青
                 text_color = "#1a73e8"
             
             expander_title = f"{status_emoji} 【{row['date']} {row['slot']} @{row['ground_name']}】 {row['team1']} vs {row['team2']} (現在の状態: {current_status})"
@@ -272,18 +280,17 @@ with tab3:
             with st.expander(expander_title):
                 status_bar_html = f"""
                 <div style="background-color: {bg_color}; color: {text_color}; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; border-left: 6px solid {text_color};">
-                    {status_emoji} 現在のステータス: {current_status}
+                    {status_emoji} {status_display_text}
                 </div>
                 """
                 st.markdown(status_bar_html, unsafe_allow_html=True)
                 
-                # 【③・④改善】未消化・不戦敗を含むすべてのステータスを選択可能に
+                # すべてのステータスをプルダウンで選択可能
                 status = st.selectbox("試合ステータスを更新する", ["未消化", "通常消化", "雨天中止", "不戦敗"], key=f"st_{m_id}")
                 
-                # 【③・追加改善】「未消化」への更新処理
+                # 「未消化」への更新処理
                 if status == "未消化":
                     if st.button("結果を保存", key=f"save_unplayed_{m_id}"):
-                        # 確定状態から「未消化」に戻る場合は、resultsからスコアレコードを完全削除
                         if current_status in ["通常消化", "不戦敗"]:
                             updated_res_df = res_df[res_df['id'] != m_id]
                         else:
@@ -306,7 +313,7 @@ with tab3:
                         st.success("試合結果を保存しました。")
                         st.rerun()
                         
-                # 【追加改善】「雨天中止」への更新処理
+                # 「雨天中止」への更新処理
                 elif status == "雨天中止":
                     if st.button("🚨 雨天中止を確定して再試合プールへ戻す", key=f"rain_{m_id}"):
                         updated_sched_df = sched_df[sched_df['id'] != m_id]
@@ -319,7 +326,6 @@ with tab3:
                         slots_df.loc[slots_df['id'] == m_id, 'status'] = '未割り当て'
                         conn.update(worksheet="available_slots", data=slots_df)
                         
-                        # 確定状態から「雨天中止」になる場合は、resultsからスコアレコードを完全削除
                         if current_status in ["通常消化", "不戦敗"]:
                             updated_res_df = res_df[res_df['id'] != m_id]
                         else:
@@ -332,7 +338,7 @@ with tab3:
                         st.success("スケジュールを削除し、対戦カードをプールに戻しました。該当のスコアレコードも削除されました。")
                         st.rerun()
 
-                # 【④・⑤改善】「不戦敗」への更新処理
+                # 「不戦敗」への更新処理
                 elif status == "不戦敗":
                     lose_team = st.radio(
                         "どちらのチームが不戦敗（負け）となりましたか？", 
@@ -341,7 +347,6 @@ with tab3:
                     )
                     
                     if st.button("結果を保存", key=f"save_forfeit_{m_id}"):
-                        # 負けた方が0点、勝った方が10点
                         if lose_team == row['team1']:
                             final_score = "0-10"
                         else:
