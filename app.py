@@ -570,7 +570,6 @@ with tab4:
             "  * **行削除:** 行の左側をチェックして、キーボードの `Delete` キーを押します。"
         )
         
-        # エディタの構成を定義して入力しやすくする
         edited_grounds_df = st.data_editor(
             grounds_df, 
             num_rows="dynamic", 
@@ -584,7 +583,19 @@ with tab4:
         )
         
         if st.button("💾 グラウンドマスタの変更を保存する", type="primary", key="btn_save_grounds"):
-            conn.update(worksheet="grounds", data=edited_grounds_df)
+            # 1. 必須のカラム名が存在するかチェックしたうえで、空行をスキップ
+            if "name" in edited_grounds_df.columns:
+                cleaned_grounds_df = edited_grounds_df.dropna(subset=["name"]).copy()
+            else:
+                cleaned_grounds_df = edited_grounds_df.copy()
+                
+            # 2. NaN（未入力）を空文字に変換（GSheetsのシリアライズエラー対策）
+            cleaned_grounds_df = cleaned_grounds_df.fillna("")
+            
+            # 3. 削除や追加で崩れたDataFrameのインデックスをきれいに初期化
+            cleaned_grounds_df = cleaned_grounds_df.reset_index(drop=True)
+            
+            conn.update(worksheet="grounds", data=cleaned_grounds_df)
             st.cache_data.clear()
             st.success("🎉 グラウンドマスタをスプレッドシートに保存しました！")
             st.rerun()
@@ -607,7 +618,19 @@ with tab4:
         )
         
         if st.button("💾 チームマスタの変更を保存する", type="primary", key="btn_save_teams"):
-            conn.update(worksheet="teams", data=edited_teams_df)
+            # 1. 必須のカラム名が存在するかチェックしたうえで、空行をスキップ
+            if "team" in edited_teams_df.columns:
+                cleaned_teams_df = edited_teams_df.dropna(subset=["team"]).copy()
+            else:
+                cleaned_teams_df = edited_teams_df.copy()
+                
+            # 2. NaN（未入力）を空文字に変換
+            cleaned_teams_df = cleaned_teams_df.fillna("")
+            
+            # 3. インデックスをきれいに初期化
+            cleaned_teams_df = cleaned_teams_df.reset_index(drop=True)
+            
+            conn.update(worksheet="teams", data=cleaned_teams_df)
             st.cache_data.clear()
             st.success("🎉 チームマスタをスプレッドシートに保存しました！")
             st.rerun()
