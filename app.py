@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 
 st.set_page_config(page_title="TRL日程管理システム", layout="wide")
@@ -137,7 +137,36 @@ with tab1:
     with col_t1:
         select_team = st.selectbox("あなたのチーム名を選択してください", ["選択してください"] + all_teams)
     with col_t2:
-        select_ng_date = st.date_input("試合NGにする日を選択")
+        # 【改善機能】実行月を基準に、自動で「翌月の日曜日」だけを抽出して選択肢にするロジック
+        today = datetime.now()
+        
+        # 1. 次月の1日を算出
+        if today.month == 12:
+            next_month_first = datetime(today.year + 1, 1, 1)
+        else:
+            next_month_first = datetime(today.year, today.month + 1, 1)
+            
+        # 2. 次月の翌月の1日を算出（ループ終了条件）
+        if next_month_first.month == 12:
+            following_month_first = datetime(next_month_first.year + 1, 1, 1)
+        else:
+            following_month_first = datetime(next_month_first.year, next_month_first.month + 1, 1)
+            
+        # 3. 次月の日曜日（weekday == 6）をリストアップ
+        next_month_sundays = []
+        curr = next_month_first
+        while curr < following_month_first:
+            if curr.weekday() == 6:  # 6は日曜日
+                next_month_sundays.append(curr.date())
+            curr += timedelta(days=1)
+            
+        # 4. st.date_input から st.selectbox へ変更
+        select_ng_date = st.selectbox(
+            "試合NGにする日を選択（次月の日曜日のみ）", 
+            options=next_month_sundays,
+            format_func=lambda x: x.strftime('%Y-%m-%d（日）')
+        )
+        
         target_month = str(select_ng_date)[:7]
         st.caption(f"対象月（自動取得）: **{target_month}**")
         
