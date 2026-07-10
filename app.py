@@ -5,8 +5,8 @@ import random
 from datetime import datetime
 import io
 
-st.set_page_config(page_title="野球リーグ総合管理システム", layout="wide")
-st.title("⚾ 野球リーグ日程・マスタ完全管理システム")
+st.set_page_config(page_title="TRL日程管理システム", layout="wide")
+st.title("⚾ TRL日程管理システム")
 
 # ==========================================
 # 1. Googleスプレッドシートからの全7シート読込
@@ -123,15 +123,15 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
 # 3. 画面UIレイアウト（4つのタブ）
 # ==========================================
 tab1, tab2, tab3, tab4 = st.tabs([
-    "📅 チーム代表者向け：NG日登録", 
-    "🛠️ 運営向け：グラウンド枠登録・自動作成", 
+    "📅 NG日登録", 
+    "🛠️ グラウンド枠登録・日程作成", 
     "🏆 試合結果入力", 
     "⚙️ マスタ・データ確認"
 ])
 
 # --- タブ1: NG日登録 ---
 with tab1:
-    st.header("📢 各チーム代表者専用：次月のNG日登録フォーム")
+    st.header("📢 NG日登録")
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         select_team = st.selectbox("あなたのチーム名を選択してください", ["選択してください"] + all_teams)
@@ -155,7 +155,7 @@ with tab1:
 
 # --- タブ2: グラウンド枠登録 ＆ 日程自動作成 ---
 with tab2:
-    st.header("🛠️ グラウンド枠の管理と日程の自動生成")
+    st.header("🛠️ グラウンド枠登録・日程作成")
     
     # 2-1. グラウンド枠の一時保存フォーム
     st.subheader("① 確保したグラウンド枠の登録（随時保存可能）")
@@ -363,7 +363,7 @@ with tab2:
 # 4. 試合結果入力（タブ3）
 # ==========================================
 with tab3:
-    st.header("🏆 試合結果の登録")
+    st.header("🏆 試合結果入力")
     if sched_df.empty:
         st.warning("確定した日程がありません。")
     else:
@@ -497,7 +497,7 @@ with tab3:
 # 5. 各種マスタデータの確認（タブ4）
 # ==========================================
 with tab4:
-    st.header("⚙️ 登録データ・全シートの生確認")
+    st.header("⚙️ マスタ・データ確認")
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("🏟️ グラウンドマスタ")
