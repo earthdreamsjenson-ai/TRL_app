@@ -26,6 +26,12 @@ def load_all_data():
 
 pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df = load_all_data()
 
+# 【エラー対策】読み込み直後にマスタのフラグ列を強制的に真偽値(bool)に変換
+if 'allow_far' in teams_df.columns:
+    teams_df['allow_far'] = teams_df['allow_far'].fillna(False).astype(bool)
+if 'is_far' in grounds_df.columns:
+    grounds_df['is_far'] = grounds_df['is_far'].fillna(False).astype(bool)
+
 # マスタデータの辞書化・リスト化
 all_teams = teams_df['team'].tolist()
 team_allow_far = dict(zip(teams_df['team'], teams_df['allow_far']))
@@ -378,32 +384,24 @@ with tab2:
         display_sched['GoogleMap_URL'] = display_sched['ground_name'].map(ground_maps)
         st.dataframe(display_sched, use_container_width=True)
 
-        # ==========================================
-        # 【新機能】📱 LINEグループ送信用のテキスト作成
-        # ==========================================
+        # 📱 LINEグループ送信用のテキスト作成
         st.markdown("---")
         st.subheader("📱 LINEグループ配信用テキスト生成")
         
-        # セレクトボックスで現在選択されている対象月（例: "2026-07"）のデータのみ抽出
         line_sched = sched_df[sched_df['date'].astype(str).str.startswith(target_month_sched)].copy()
         
         if line_sched.empty:
             st.info(f"💡 選択中の対象月（{target_month_sched}）の確定スケジュールがまだ登録されていません。")
         else:
-            # "2026-07" から数字の "7" を動的に取り出す
             display_month = str(int(target_month_sched.split("-")[1]))
-            
-            # 日付と時間枠の昇順で綺麗に並び替え
             line_sched = line_sched.sort_values(by=["date", "slot"])
             
-            # メッセージテンプレート構築
             line_msg = f"【{display_month}月日程】\n"
             line_msg += "日程担当の中山です。\n"
             line_msg += f"{display_month}月の日程連絡させていただきます。\n"
             line_msg += "※左に記載のチームがホームチームです\n\n"
             
             for _, row in line_sched.iterrows():
-                # YYYY-MM-DD から MM/DD 形式へ安全に変換
                 try:
                     date_formatted = datetime.strptime(row['date'], "%Y-%m-%d").strftime("%m/%d")
                 except Exception:
@@ -412,9 +410,7 @@ with tab2:
                 line_msg += f"{row['team1']}-{row['team2']}\n"
                 line_msg += f"{date_formatted} {row['slot']} {row['ground_name']}\n\n"
             
-            # 末尾の無駄な改行をトリミング
             line_msg = line_msg.strip()
-            
             st.text_area(
                 "📋 以下のテキストエリアをクリックし、全選択（Ctrl+A / ⌘+A）してコピーしてください", 
                 value=line_msg, 
@@ -570,6 +566,10 @@ with tab4:
             "  * **行削除:** 行の左側をチェックして、キーボードの `Delete` キーを押します。"
         )
         
+        # 【修正】FLOAT型エラー対策：is_far列を強制的に真偽値(bool)に型変換
+        if "is_far" in grounds_df.columns:
+            grounds_df["is_far"] = grounds_df["is_far"].fillna(False).astype(bool)
+        
         edited_grounds_df = st.data_editor(
             grounds_df, 
             num_rows="dynamic", 
@@ -583,16 +583,13 @@ with tab4:
         )
         
         if st.button("💾 グラウンドマスタの変更を保存する", type="primary", key="btn_save_grounds"):
-            # 1. 必須のカラム名が存在するかチェックしたうえで、空行をスキップ
             if "name" in edited_grounds_df.columns:
                 cleaned_grounds_df = edited_grounds_df.dropna(subset=["name"]).copy()
             else:
                 cleaned_grounds_df = edited_grounds_df.copy()
                 
-            # 2. NaN（未入力）を空文字に変換（GSheetsのシリアライズエラー対策）
+            # NaNを空欄に補正し、インデックスを振り直す
             cleaned_grounds_df = cleaned_grounds_df.fillna("")
-            
-            # 3. 削除や追加で崩れたDataFrameのインデックスをきれいに初期化
             cleaned_grounds_df = cleaned_grounds_df.reset_index(drop=True)
             
             conn.update(worksheet="grounds", data=cleaned_grounds_df)
@@ -606,6 +603,10 @@ with tab4:
             "💡 **編集方法:** グラウンドマスタと同様に、セルの直接書き換え・行追加・削除が可能です。"
         )
         
+        # 【修正】FLOAT型エラー対策：allow_far列を強制的に真偽値(bool)に型変換
+        if "allow_far" in teams_df.columns:
+            teams_df["allow_far"] = teams_df["allow_far"].fillna(False).astype(bool)
+            
         edited_teams_df = st.data_editor(
             teams_df,
             num_rows="dynamic",
@@ -618,16 +619,13 @@ with tab4:
         )
         
         if st.button("💾 チームマスタの変更を保存する", type="primary", key="btn_save_teams"):
-            # 1. 必須のカラム名が存在するかチェックしたうえで、空行をスキップ
             if "team" in edited_teams_df.columns:
                 cleaned_teams_df = edited_teams_df.dropna(subset=["team"]).copy()
             else:
                 cleaned_teams_df = edited_teams_df.copy()
                 
-            # 2. NaN（未入力）を空文字に変換
+            # NaNを空欄に補正し、インデックスを振り直す
             cleaned_teams_df = cleaned_teams_df.fillna("")
-            
-            # 3. インデックスをきれいに初期化
             cleaned_teams_df = cleaned_teams_df.reset_index(drop=True)
             
             conn.update(worksheet="teams", data=cleaned_teams_df)
@@ -644,13 +642,12 @@ with tab4:
             st.subheader("🔥 残りの未消化試合プール")
             st.dataframe(pool_df, use_container_width=True)
 
-# --- タブ5: 各チームの残試合数確認【改良版】 ---
+# --- タブ5: 各チームの残試合数確認 ---
 with tab5:
     st.header("📊 各チームの残試合数確認")
     st.markdown("リーグ全体の残り試合数の集計状況です。総残試合数が多い順に表示しています。")
 
     today_str = datetime.now().strftime('%Y-%m-%d')
-
     remaining_data = []
     
     if not res_df.empty and 'id' in res_df.columns:
