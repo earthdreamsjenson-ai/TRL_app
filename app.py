@@ -3,6 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import random
 from datetime import datetime
+import io
 
 st.set_page_config(page_title="野球リーグ総合管理システム", layout="wide")
 st.title("⚾ 野球リーグ日程・マスタ完全管理システム")
@@ -158,30 +159,157 @@ with tab2:
     
     # 2-1. グラウンド枠の一時保存フォーム
     st.subheader("① 確保したグラウンド枠の登録（随時保存可能）")
-    with st.form("slot_input_form"):
-        col_g1, col_g2, col_g3 = st.columns(3)
-        slot_date = col_g1.date_input("確保した日付")
-        slot_time = col_g2.selectbox("時間枠", [
-            "9:00-12:00", "11:00-14:00", "12:00-15:00", "12:00-18:00", "13:00-17:00", "14:00-17:00", "15:00-18:00"
-        ])
-        slot_ground = col_g3.selectbox("グラウンド名", ground_options)
+    
+    reg_mode = st.radio(
+        "登録モードを選択してください", 
+        ["1件ずつ登録", "画面でまとめて登録 (Excel風)", "テキストを直接貼り付けて登録", "CSVファイルから一括アップロード"], 
+        horizontal=True
+    )
+    
+    # --- モード1: 1件ずつ登録 ---
+    if reg_mode == "1件ずつ登録":
+        with st.form("slot_input_form"):
+            col_g1, col_g2, col_g3 = st.columns(3)
+            slot_date = col_g1.date_input("確保した日付")
+            slot_time = col_g2.selectbox("時間枠", [
+                "9:00-12:00", "11:00-14:00", "12:00-15:00", "12:00-18:00", "13:00-17:00", "14:00-17:00", "15:00-18:00"
+            ])
+            slot_ground = col_g3.selectbox("グラウンド名", ground_options)
+            
+            submit_slot = st.form_submit_button("💾 この枠をデータベースに保存する")
+            if submit_slot:
+                generated_id = f"S_{slot_date}_{slot_time}_{slot_ground}"
+                ym = str(slot_date)[:7]
+                
+                new_slot_row = pd.DataFrame([{
+                    "id": generated_id, "date": str(slot_date), "slot": slot_time,
+                    "ground_name": slot_ground, "year_month": ym, "status": "未割り当て"
+                }])
+                filtered_slots = slots_df[slots_df['id'] != generated_id]
+                updated_slots_df = pd.concat([filtered_slots, new_slot_row], ignore_index=True)
+                
+                conn.update(worksheet="available_slots", data=updated_slots_df)
+                st.cache_data.clear()
+                st.success(f"枠 {generated_id} を「未割り当て」として保存しました！")
+                st.rerun()
+
+    # --- モード2: 画面でまとめて登録（Excel風） ---
+    elif reg_mode == "画面でまとめて登録 (Excel風)":
+        st.markdown("💡 **Excel等から複数行をコピー（Ctrl+C）し、下の表に貼り付け（Ctrl+V）が可能です。**")
+        input_template = pd.DataFrame(columns=["date", "slot", "ground_name"])
+        edited_df = st.data_editor(
+            input_template, 
+            num_rows="dynamic", 
+            use_container_width=True,
+            column_config={
+                "date": st.column_config.DateColumn("確保した日付", required=True),
+                "slot": st.column_config.SelectboxColumn("時間枠", options=[
+                    "9:00-12:00", "11:00-14:00", "12:00-15:00", "12:00-18:00", "13:00-17:00", "14:00-17:00", "15:00-18:00"
+                ], required=True),
+                "ground_name": st.column_config.SelectboxColumn("グラウンド名", options=ground_options, required=True)
+            }
+        )
         
-        submit_slot = st.form_submit_button("💾 この枠をデータベースに保存する")
-        if submit_slot:
-            generated_id = f"S_{slot_date}_{slot_time}_{slot_ground}"
-            ym = str(slot_date)[:7]
-            
-            new_slot_row = pd.DataFrame([{
-                "id": generated_id, "date": str(slot_date), "slot": slot_time,
-                "ground_name": slot_ground, "year_month": ym, "status": "未割り当て"
-            }])
-            filtered_slots = slots_df[slots_df['id'] != generated_id]
-            updated_slots_df = pd.concat([filtered_slots, new_slot_row], ignore_index=True)
-            
-            conn.update(worksheet="available_slots", data=updated_slots_df)
-            st.cache_data.clear()
-            st.success(f"枠 {generated_id} を「未割り当て」として保存しました！")
-            st.rerun()
+        if st.button("💾 入力した枠をまとめてデータベースに保存する", type="primary", key="bulk_save_editor"):
+            valid_df = edited_df.dropna(subset=["date", "slot", "ground_name"]).copy()
+            if valid_df.empty:
+                st.warning("登録する有効なデータが入力されていません。")
+            else:
+                valid_df['date'] = valid_df['date'].astype(str)
+                valid_df['id'] = "S_" + valid_df['date'] + "_" + valid_df['slot'] + "_" + valid_df['ground_name']
+                valid_df['year_month'] = valid_df['date'].str[:7]
+                valid_df['status'] = "未割り当て"
+                
+                new_ids = valid_df['id'].tolist()
+                filtered_slots = slots_df[~slots_df['id'].isin(new_ids)]
+                updated_slots_df = pd.concat([filtered_slots, valid_df], ignore_index=True)
+                
+                conn.update(worksheet="available_slots", data=updated_slots_df)
+                st.cache_data.clear()
+                st.success(f"🎉 {len(valid_df)} 件のグラウンド枠をまとめて保存しました！")
+                st.rerun()
+
+    # --- モード3: テキストを直接貼り付けて登録 ---
+    elif reg_mode == "テキストを直接貼り付けて登録":
+        st.markdown("💡 **カンマ区切りのテキストをそのまま貼り付けて一括登録できます。**")
+        default_example = "日,時間,施設名\n2026/07/05,12:00-15:00,額田G\n2026/07/05,15:00-18:00,額田G\n2026/07/12,12:00-15:00,三百田公園G"
+        
+        bulk_text = st.text_area(
+            "ここにデータを貼り付けてください（1行目は「日,時間,施設名」にしてください）",
+            value=default_example,
+            height=200
+        )
+        
+        if st.button("🚀 貼り付けたテキストから一括登録を実行", type="primary", key="bulk_save_text"):
+            if not bulk_text.strip() or bulk_text.strip() == "日,時間,施設名":
+                st.warning("登録するデータが入力されていません。")
+            else:
+                try:
+                    parsed_df = pd.read_csv(io.StringIO(bulk_text.strip()))
+                    expected_cols = ["日", "時間", "施設名"]
+                    if not all(col in parsed_df.columns for col in expected_cols):
+                        st.error("❌ 1行目のヘッダー（列名）は必ず「日,時間,施設名」にしてください。")
+                    else:
+                        parsed_df = parsed_df.rename(columns={"日": "date", "時間": "slot", "施設名": "ground_name"})
+                        valid_df = parsed_df.dropna(subset=["date", "slot", "ground_name"]).copy()
+                        
+                        # 日付フォーマットの自動変換 (YYYY/MM/DD -> YYYY-MM-DD)
+                        valid_df['date'] = pd.to_datetime(valid_df['date']).dt.strftime('%Y-%m-%d')
+                        
+                        valid_df['id'] = "S_" + valid_df['date'] + "_" + valid_df['slot'] + "_" + valid_df['ground_name']
+                        valid_df['year_month'] = valid_df['date'].str[:7]
+                        valid_df['status'] = "未割り当て"
+                        
+                        # マスタチェック
+                        invalid_grounds = valid_df[~valid_df['ground_name'].isin(ground_options)]['ground_name'].unique()
+                        if len(invalid_grounds) > 0:
+                            st.warning(f"⚠️ 注意: 「{', '.join(invalid_grounds)}」はグラウンドマスタに登録されていない名称です。自動作成に影響する可能性があるためご確認ください。")
+                        
+                        new_ids = valid_df['id'].tolist()
+                        filtered_slots = slots_df[~slots_df['id'].isin(new_ids)]
+                        updated_slots_df = pd.concat([filtered_slots, valid_df], ignore_index=True)
+                        
+                        conn.update(worksheet="available_slots", data=updated_slots_df)
+                        st.cache_data.clear()
+                        st.success(f"🎉 テキストから {len(valid_df)} 件のグラウンド枠を正常に登録しました！")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"🚨 テキストの解析中にエラーが発生しました。エラー詳細: {e}")
+
+    # --- モード4: CSVファイルから一括登録 ---
+    elif reg_mode == "CSVファイルから一括アップロード":
+        st.markdown("💡 **以下のヘッダー（列名）を持つCSVファイルをアップロードしてください。**")
+        st.code("date,slot,ground_name\n2026-07-12,13:00-17:00,南明柄グラウンド")
+        
+        uploaded_file = st.file_uploader("CSVファイルを選択", type=["csv"])
+        if uploaded_file is not None:
+            try:
+                uploaded_df = pd.read_csv(uploaded_file)
+                required_cols = ["date", "slot", "ground_name"]
+                
+                if not all(col in uploaded_df.columns for col in required_cols):
+                    st.error(f"❌ CSVファイルのヘッダーが正しくありません。 {required_cols} を含めてください。")
+                else:
+                    st.write("📋 アップロードデータのプレビュー:")
+                    st.dataframe(uploaded_df, use_container_width=True)
+                    
+                    if st.button("💾 CSVのデータをデータベースに保存する", type="primary", key="bulk_save_csv"):
+                        valid_df = uploaded_df.dropna(subset=["date", "slot", "ground_name"]).copy()
+                        valid_df['date'] = valid_df['date'].astype(str)
+                        valid_df['id'] = "S_" + valid_df['date'] + "_" + valid_df['slot'] + "_" + valid_df['ground_name']
+                        valid_df['year_month'] = valid_df['date'].str[:7]
+                        valid_df['status'] = "未割り当て"
+                        
+                        new_ids = valid_df['id'].tolist()
+                        filtered_slots = slots_df[~slots_df['id'].isin(new_ids)]
+                        updated_slots_df = pd.concat([filtered_slots, valid_df], ignore_index=True)
+                        
+                        conn.update(worksheet="available_slots", data=updated_slots_df)
+                        st.cache_data.clear()
+                        st.success(f"🎉 CSVから {len(valid_df)} 件のグラウンド枠をまとめて保存しました！")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"🚨 ファイルの読み込み中にエラーが発生しました: {e}")
 
     st.markdown("---")
     
@@ -231,7 +359,9 @@ with tab2:
         display_sched['GoogleMap_URL'] = display_sched['ground_name'].map(ground_maps)
         st.dataframe(display_sched, use_container_width=True)
 
-# --- タブ3: 試合結果入力 ---
+# ==========================================
+# 4. 試合結果入力（タブ3）
+# ==========================================
 with tab3:
     st.header("🏆 試合結果の登録")
     if sched_df.empty:
@@ -245,13 +375,10 @@ with tab3:
             
             status_display_text = f"現在のステータス: {current_status}"
             
-            # ステータスに応じた「絵文字」「背景色・文字色」および詳細可視化ロジック
             if current_status == "通常消化":
                 status_emoji = "🟢"
-                bg_color = "#e6f4ea"      # 黄緑
+                bg_color = "#e6f4ea"
                 text_color = "#137333"
-                
-                # 【追加改善】通常消化のスコアを解析して ○ × 判定を表示
                 try:
                     if "-" in str(current_score):
                         s1_str, s2_str = str(current_score).split("-")
@@ -269,12 +396,12 @@ with tab3:
                 
             elif current_status == "雨天中止":
                 status_emoji = "⚫"
-                bg_color = "#f1f3f4"      # 灰色
+                bg_color = "#f1f3f4"
                 text_color = "#5f6368"
                 
             elif current_status == "不戦敗":
                 status_emoji = "🟡"
-                bg_color = "#fef7e0"      # クリーム色
+                bg_color = "#fef7e0"
                 text_color = "#b06000"
                 if current_score == "0-10":
                     status_display_text += f" (❌ 不戦敗: {row['team1']} / ⭕ 不戦勝: {row['team2']})"
@@ -284,7 +411,7 @@ with tab3:
                     status_display_text += f" (スコア: {current_score})"
             else:
                 status_emoji = "⚪"
-                bg_color = "#e8f0fe"      # 薄い青
+                bg_color = "#e8f0fe"
                 text_color = "#1a73e8"
             
             expander_title = f"{status_emoji} 【{row['date']} {row['slot']} @{row['ground_name']}】 {row['team1']} vs {row['team2']} (現在の状態: {current_status})"
@@ -299,7 +426,6 @@ with tab3:
                 
                 status = st.selectbox("試合ステータスを更新する", ["未消化", "通常消化", "雨天中止", "不戦敗"], key=f"st_{m_id}")
                 
-                # 「未消化」への更新処理
                 if status == "未消化":
                     if st.button("結果を保存", key=f"save_unplayed_{m_id}"):
                         if current_status in ["通常消化", "不戦敗"]:
@@ -310,7 +436,7 @@ with tab3:
                         
                         conn.update(worksheet="results", data=updated_res_df)
                         st.cache_data.clear()
-                        st.success("ステータスを『未消化』に更新しました（スコアレコードはリセットされました）。")
+                        st.success("ステータスを『未消化』に更新しました。")
                         st.rerun()
 
                 elif status == "通常消化":
@@ -324,7 +450,6 @@ with tab3:
                         st.success("試合結果を保存しました。")
                         st.rerun()
                         
-                # 「雨天中止」への更新処理
                 elif status == "雨天中止":
                     if st.button("🚨 雨天中止を確定して再試合プールへ戻す", key=f"rain_{m_id}"):
                         updated_sched_df = sched_df[sched_df['id'] != m_id]
@@ -345,11 +470,9 @@ with tab3:
                         
                         conn.update(worksheet="results", data=updated_res_df)
                         st.cache_data.clear()
-                        
-                        st.success("スケジュールを削除し、対戦カードをプールに戻しました。該当のスコアレコードも削除されました。")
+                        st.success("スケジュールを削除し、対戦カードをプールに戻しました。")
                         st.rerun()
 
-                # 「不戦敗」への更新処理
                 elif status == "不戦敗":
                     lose_team = st.radio(
                         "どちらのチームが不戦敗（負け）となりましたか？", 
@@ -370,7 +493,9 @@ with tab3:
                         st.success(f"不戦敗の結果を保存しました。（スコア: {final_score}）")
                         st.rerun()
 
-# --- タブ4: 各種マスタデータの確認 ---
+# ==========================================
+# 5. 各種マスタデータの確認（タブ4）
+# ==========================================
 with tab4:
     st.header("⚙️ 登録データ・全シートの生確認")
     c1, c2 = st.columns(2)
