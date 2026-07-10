@@ -120,7 +120,7 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
     return pd.DataFrame(), match_list, []
 
 # ==========================================
-# 3. 画面UIレイアウト（5つのタブに拡張）
+# 3. 画面UIレイアウト（5つのタブ）
 # ==========================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📅 NG日登録", 
@@ -509,32 +509,54 @@ with tab4:
         st.subheader("🔥 残りの未消化試合プール")
         st.dataframe(pool_df)
 
-# --- タブ5: 各チームの残試合数確認【新設機能】 ---
+# --- タブ5: 各チームの残試合数確認【改良版】 ---
 with tab5:
     st.header("📊 各チームの残試合数確認")
-    st.markdown("リーグ全体の残り試合数の集計状況です。残試合数が多い順に表示しています。")
+    st.markdown("リーグ全体の残り試合数の集計状況です。総残試合数が多い順に表示しています。")
+
+    # 本日の日付を YYYY-MM-DD 形式の文字列で取得
+    today_str = datetime.now().strftime('%Y-%m-%d')
 
     remaining_data = []
-    # 既に消化済み（通常消化または不戦敗）の試合IDリストを取得
-    finished_ids = res_df[res_df['status'].isin(['通常消化', '不戦敗'])]['id'].tolist() if not res_df.empty else []
+    
+    # 【修正箇所】処理が完了した試合（通常消化、不戦敗、雨天中止）のIDを文字列型で一括抽出
+    if not res_df.empty and 'id' in res_df.columns:
+        exclude_ids = set(res_df[res_df['status'].isin(['通常消化', '不戦敗', '雨天中止'])]['id'].astype(str).tolist())
+    else:
+        exclude_ids = set()
 
     for team in all_teams:
         # 1. 未日程の試合数 (match_pool に残っている対戦)
         unallocated = ((pool_df['team1'] == team) | (pool_df['team2'] == team)).sum() if not pool_df.empty else 0
         
-        # 2. 日程確定済・結果未消化の試合数 (schedule にあり、結果に「通常消化/不戦敗」が登録されていないもの)
-        allocated_unplayed = 0
+        # 2. 日程確定済みの未消化試合（過去 / 未来に分解）
+        past_unplayed = 0
+        future_unplayed = 0
+        
         if not sched_df.empty:
-            unplayed_sched = sched_df[~sched_df['id'].isin(finished_ids)]
-            allocated_unplayed = ((unplayed_sched['team1'] == team) | (unplayed_sched['team2'] == team)).sum()
+            # IDを強制的に文字列化して、処理済みID（消化済＋雨天中止）を除外
+            unplayed_sched = sched_df[~sched_df['id'].astype(str).isin(exclude_ids)]
+            
+            # 自チームが関わる試合に絞り込み
+            team_sched = unplayed_sched[(unplayed_sched['team1'] == team) | (unplayed_sched['team2'] == team)]
+            
+            if not team_sched.empty:
+                # 試合日が今日より前のもの（結果の入力忘れ・漏れ）
+                past_unplayed = (team_sched['date'].astype(str) < today_str).sum()
+                # 試合日が今日以降のもの（これから開催予定の未来の試合）
+                future_unplayed = (team_sched['date'].astype(str) >= today_str).sum()
         
         remaining_data.append({
             "チーム名": team,
-            "総残試合数": unallocated + allocated_unplayed,
+            "総残試合数": unallocated + past_unplayed + future_unplayed,
             "未日程 (プール内)": unallocated,
-            "日程確定済 (未消化)": allocated_unplayed
+            "日程済 (過去の未消化)": past_unplayed,
+            "日程済 (未来の未消化)": future_unplayed
         })
 
-    # データフレームに変換し、総残試合数が多い順にソートして表示
+    # データフレームに変換し表示
     remaining_df = pd.DataFrame(remaining_data).sort_values(by="総残試合数", ascending=False)
     st.dataframe(remaining_df, use_container_width=True, hide_index=True)
+    
+    st.info(f"💡 **「日程済 (過去の未消化)」**は、試合日が既に過ぎている（{today_str} より前）のに結果が入力されていない試合です。結果の入力漏れがないかご確認ください。\n\n"
+            f"💡 **「日程済 (未来の未消化)」**は、これから行う予定の試合（自動生成したばかりの次月以降の日程など）です。")
