@@ -26,12 +26,16 @@ def load_all_data():
 
 pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df = load_all_data()
 
-# 【エラー対策】読み込み直後にマスタのフラグ列を強制的に真偽値(bool)に変換
+# チームマスタの型修正
 if 'allow_far' in teams_df.columns:
     teams_df['allow_far'] = teams_df['allow_far'].fillna(False).astype(bool)
+
+# グラウンドマスタの型修正
 if 'is_far' in grounds_df.columns:
     grounds_df['is_far'] = grounds_df['is_far'].fillna(False).astype(bool)
-
+if 'maps_url' in grounds_df.columns:
+    grounds_df['maps_url'] = grounds_df['maps_url'].fillna("").astype(str)
+    
 # マスタデータの辞書化・リスト化
 all_teams = teams_df['team'].tolist()
 team_allow_far = dict(zip(teams_df['team'], teams_df['allow_far']))
