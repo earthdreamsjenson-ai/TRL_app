@@ -4,7 +4,7 @@ import pandas as pd
 import random
 from datetime import datetime, timedelta
 import io
-from collections import Counter  # 【追加】残試合数カウント用
+from collections import Counter
 
 st.set_page_config(page_title="TRL日程管理システム", layout="wide")
 st.title("⚾ TRL日程管理システム")
@@ -71,7 +71,7 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
                 continue
                 
             allocated_matches.append({
-                'id': current_slot['id'], # グラウンド枠のIDを引き継ぐ
+                'id': current_slot['id'], 
                 'date': date,
                 'slot': current_slot['slot'],
                 'ground_name': current_slot['ground_name'],
@@ -89,7 +89,6 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
             team_monthly_counts[t2] -= 1
             allocated_matches.pop()
             
-        # 試合が組めなかった場合は「空き枠」として処理
         allocated_matches.append({
             'id': current_slot['id'],
             'date': date,
@@ -102,15 +101,8 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
         allocated_matches.pop()
         return False
 
-    # 【改善機能】プール内の残試合数が多いチームの対戦を最優先にするロジック
-    # 1. 各チームが現在のプール内に何回登場するか（＝残試合数）をカウント
     pool_team_counts = Counter([team for match in match_list for team in match])
-    
-    # 2. 最初に対戦リストをシャッフル（残試合数が同じチーム同士のタイブレークにおける偏りを防ぐ）
     random.shuffle(match_list)
-    
-    # 3. 対戦ペアの「双方の残試合数の合計」が多い順（降順）にソート
-    # 例: 残り5試合のチームA vs 残り4試合のチームB (合計9) を、残り2試合 vs 残り1試合 (合計3) より優先する
     match_list.sort(key=lambda m: pool_team_counts[m[0]] + pool_team_counts[m[1]], reverse=True)
 
     if backtrack(0):
@@ -126,7 +118,7 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
                     'team1': m['match'][0],
                     'team2': m['match'][1]
                 })
-                filled_slot_ids.append(m['id']) # マッチングが成功した枠のID
+                filled_slot_ids.append(m['id'])
         return pd.DataFrame(new_games), match_list, filled_slot_ids
     return pd.DataFrame(), match_list, []
 
@@ -148,30 +140,25 @@ with tab1:
     with col_t1:
         select_team = st.selectbox("あなたのチーム名を選択してください", ["選択してください"] + all_teams)
     with col_t2:
-        # 【改善機能】実行月を基準に、自動で「翌月の日曜日」だけを抽出して選択肢にするロジック
         today = datetime.now()
         
-        # 1. 次月の1日を算出
         if today.month == 12:
             next_month_first = datetime(today.year + 1, 1, 1)
         else:
             next_month_first = datetime(today.year, today.month + 1, 1)
             
-        # 2. 次月の翌月の1日を算出（ループ終了条件）
         if next_month_first.month == 12:
             following_month_first = datetime(next_month_first.year + 1, 1, 1)
         else:
             following_month_first = datetime(next_month_first.year, next_month_first.month + 1, 1)
             
-        # 3. 次月の日曜日（weekday == 6）をリストアップ
         next_month_sundays = []
         curr = next_month_first
         while curr < following_month_first:
-            if curr.weekday() == 6:  # 6は日曜日
+            if curr.weekday() == 6:  
                 next_month_sundays.append(curr.date())
             curr += timedelta(days=1)
             
-        # 4. st.date_input から st.selectbox へ変更
         select_ng_date = st.selectbox(
             "試合NGにする日を選択（次月の日曜日のみ）", 
             options=next_month_sundays,
@@ -198,16 +185,13 @@ with tab1:
 with tab2:
     st.header("🛠️ グラウンド枠登録・日程作成")
     
-    # 2-1. グラウンド枠の一時保存フォーム
     st.subheader("① 確保したグラウンド枠の登録（随時保存可能）")
-    
     reg_mode = st.radio(
         "登録モードを選択してください", 
         ["1件ずつ登録", "画面でまとめて登録 (Excel風)", "テキストを直接貼り付けて登録", "CSVファイルから一括アップロード"], 
         horizontal=True
     )
     
-    # --- モード1: 1件ずつ登録 ---
     if reg_mode == "1件ずつ登録":
         with st.form("slot_input_form"):
             col_g1, col_g2, col_g3 = st.columns(3)
@@ -234,7 +218,6 @@ with tab2:
                 st.success(f"枠 {generated_id} を「未割り当て」として保存しました！")
                 st.rerun()
 
-    # --- モード2: 画面でまとめて登録（Excel風） ---
     elif reg_mode == "画面でまとめて登録 (Excel風)":
         st.markdown("💡 **Excel等から複数行をコピー（Ctrl+C）し、下の表に貼り付け（Ctrl+V）が可能です。**")
         input_template = pd.DataFrame(columns=["date", "slot", "ground_name"])
@@ -270,7 +253,6 @@ with tab2:
                 st.success(f"🎉 {len(valid_df)} 件のグラウンド枠をまとめて保存しました！")
                 st.rerun()
 
-    # --- モード3: テキストを直接貼り付けて登録 ---
     elif reg_mode == "テキストを直接貼り付けて登録":
         st.markdown("💡 **カンマ区切りのテキストをそのまま貼り付けて一括登録できます。**")
         default_example = "日,時間,施設名\n2026/07/05,12:00-15:00,額田G\n2026/07/05,15:00-18:00,額田G\n2026/07/12,12:00-15:00,三百田公園G"
@@ -294,14 +276,11 @@ with tab2:
                         parsed_df = parsed_df.rename(columns={"日": "date", "時間": "slot", "施設名": "ground_name"})
                         valid_df = parsed_df.dropna(subset=["date", "slot", "ground_name"]).copy()
                         
-                        # 日付フォーマットの自動変換 (YYYY/MM/DD -> YYYY-MM-DD)
                         valid_df['date'] = pd.to_datetime(valid_df['date']).dt.strftime('%Y-%m-%d')
-                        
                         valid_df['id'] = "S_" + valid_df['date'] + "_" + valid_df['slot'] + "_" + valid_df['ground_name']
                         valid_df['year_month'] = valid_df['date'].str[:7]
                         valid_df['status'] = "未割り当て"
                         
-                        # マスタチェック
                         invalid_grounds = valid_df[~valid_df['ground_name'].isin(ground_options)]['ground_name'].unique()
                         if len(invalid_grounds) > 0:
                             st.warning(f"⚠️ 注意: 「{', '.join(invalid_grounds)}」はグラウンドマスタに登録されていない名称です。自動作成に影響する可能性があるためご確認ください。")
@@ -317,7 +296,6 @@ with tab2:
                 except Exception as e:
                     st.error(f"🚨 テキストの解析中にエラーが発生しました。エラー詳細: {e}")
 
-    # --- モード4: CSVファイルから一括登録 ---
     elif reg_mode == "CSVファイルから一括アップロード":
         st.markdown("💡 **以下のヘッダー（列名）を持つCSVファイルをアップロードしてください。**")
         st.code("date,slot,ground_name\n2026-07-12,13:00-17:00,南明柄グラウンド")
@@ -399,6 +377,49 @@ with tab2:
         display_sched = sched_df.copy()
         display_sched['GoogleMap_URL'] = display_sched['ground_name'].map(ground_maps)
         st.dataframe(display_sched, use_container_width=True)
+
+        # ==========================================
+        # 【新機能】📱 LINEグループ送信用のテキスト作成
+        # ==========================================
+        st.markdown("---")
+        st.subheader("📱 LINEグループ配信用テキスト生成")
+        
+        # セレクトボックスで現在選択されている対象月（例: "2026-07"）のデータのみ抽出
+        line_sched = sched_df[sched_df['date'].astype(str).str.startswith(target_month_sched)].copy()
+        
+        if line_sched.empty:
+            st.info(f"💡 選択中の対象月（{target_month_sched}）の確定スケジュールがまだ登録されていません。")
+        else:
+            # "2026-07" から数字の "7" を動的に取り出す
+            display_month = str(int(target_month_sched.split("-")[1]))
+            
+            # 日付と時間枠の昇順で綺麗に並び替え
+            line_sched = line_sched.sort_values(by=["date", "slot"])
+            
+            # メッセージテンプレート構築
+            line_msg = f"【{display_month}月日程】\n"
+            line_msg += "日程担当の中山です。\n"
+            line_msg += f"{display_month}月の日程連絡させていただきます。\n"
+            line_msg += "※左に記載のチームがホームチームです\n\n"
+            
+            for _, row in line_sched.iterrows():
+                # YYYY-MM-DD から MM/DD 形式へ安全に変換
+                try:
+                    date_formatted = datetime.strptime(row['date'], "%Y-%m-%d").strftime("%m/%d")
+                except Exception:
+                    date_formatted = row['date'][5:10].replace('-', '/')
+                
+                line_msg += f"{row['team1']}-{row['team2']}\n"
+                line_msg += f"{date_formatted} {row['slot']} {row['ground_name']}\n\n"
+            
+            # 末尾の無駄な改行をトリミング
+            line_msg = line_msg.strip()
+            
+            st.text_area(
+                "📋 以下のテキストエリアをクリックし、全選択（Ctrl+A / ⌘+A）してコピーしてください", 
+                value=line_msg, 
+                height=350
+            )
 
 # ==========================================
 # 4. 試合結果入力（タブ3）
@@ -554,36 +575,27 @@ with tab5:
     st.header("📊 各チームの残試合数確認")
     st.markdown("リーグ全体の残り試合数の集計状況です。総残試合数が多い順に表示しています。")
 
-    # 本日の日付を YYYY-MM-DD 形式の文字列で取得
     today_str = datetime.now().strftime('%Y-%m-%d')
 
     remaining_data = []
     
-    # 【修正箇所】処理が完了した試合（通常消化、不戦敗、雨天中止）のIDを文字列型で一括抽出
     if not res_df.empty and 'id' in res_df.columns:
         exclude_ids = set(res_df[res_df['status'].isin(['通常消化', '不戦敗', '雨天中止'])]['id'].astype(str).tolist())
     else:
         exclude_ids = set()
 
     for team in all_teams:
-        # 1. 未日程の試合数 (match_pool に残っている対戦)
         unallocated = ((pool_df['team1'] == team) | (pool_df['team2'] == team)).sum() if not pool_df.empty else 0
         
-        # 2. 日程確定済みの未消化試合（過去 / 未来に分解）
         past_unplayed = 0
         future_unplayed = 0
         
         if not sched_df.empty:
-            # IDを強制的に文字列化して、処理済みID（消化済＋雨天中止）を除外
             unplayed_sched = sched_df[~sched_df['id'].astype(str).isin(exclude_ids)]
-            
-            # 自チームが関わる試合に絞り込み
             team_sched = unplayed_sched[(unplayed_sched['team1'] == team) | (unplayed_sched['team2'] == team)]
             
             if not team_sched.empty:
-                # 試合日が今日より前のもの（結果の入力忘れ・漏れ）
                 past_unplayed = (team_sched['date'].astype(str) < today_str).sum()
-                # 試合日が今日以降のもの（これから開催予定の未来の試合）
                 future_unplayed = (team_sched['date'].astype(str) >= today_str).sum()
         
         remaining_data.append({
@@ -594,7 +606,6 @@ with tab5:
             "日程済 (未来の未消化)": future_unplayed
         })
 
-    # データフレームに変換し表示
     remaining_df = pd.DataFrame(remaining_data).sort_values(by="総残試合数", ascending=False)
     st.dataframe(remaining_df, use_container_width=True, hide_index=True)
     
