@@ -4,6 +4,7 @@ import pandas as pd
 import random
 from datetime import datetime, timedelta
 import io
+from collections import Counter  # 【追加】残試合数カウント用
 
 st.set_page_config(page_title="TRL日程管理システム", layout="wide")
 st.title("⚾ TRL日程管理システム")
@@ -101,7 +102,17 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
         allocated_matches.pop()
         return False
 
+    # 【改善機能】プール内の残試合数が多いチームの対戦を最優先にするロジック
+    # 1. 各チームが現在のプール内に何回登場するか（＝残試合数）をカウント
+    pool_team_counts = Counter([team for match in match_list for team in match])
+    
+    # 2. 最初に対戦リストをシャッフル（残試合数が同じチーム同士のタイブレークにおける偏りを防ぐ）
     random.shuffle(match_list)
+    
+    # 3. 対戦ペアの「双方の残試合数の合計」が多い順（降順）にソート
+    # 例: 残り5試合のチームA vs 残り4試合のチームB (合計9) を、残り2試合 vs 残り1試合 (合計3) より優先する
+    match_list.sort(key=lambda m: pool_team_counts[m[0]] + pool_team_counts[m[1]], reverse=True)
+
     if backtrack(0):
         new_games = []
         filled_slot_ids = []
