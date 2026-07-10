@@ -134,18 +134,21 @@ with tab1:
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         select_team = st.selectbox("あなたのチーム名を選択してください", ["選択してください"] + all_teams)
-        target_month = st.selectbox("対象の月", ["2026-07", "2026-08", "2026-09"], index=1)
     with col_t2:
         select_ng_date = st.date_input("試合NGにする日を選択")
+        # 【①改善】NG日の選択内容から対象年月（YYYY-MM形式）を自動取得
+        target_month = str(select_ng_date)[:7]
+        st.caption(f"対象月（自動取得）: **{target_month}**")
         
     if select_team != "選択してください":
         if st.button("💾 NG日を登録・上書きする", type="primary"):
             new_ng_row = pd.DataFrame([{"team": select_team, "year_month": target_month, "ng_date": str(select_ng_date)}])
+            # 【②改善】同チーム・同対象月の既存データを確実に削除（置き換え処理）
             filtered_ng = ng_df[~((ng_df['team'] == select_team) & (ng_df['year_month'] == target_month))]
             updated_ng_df = pd.concat([filtered_ng, new_ng_row], ignore_index=True)
             conn.update(worksheet="unavailable_days", data=updated_ng_df)
             st.cache_data.clear()
-            st.success(f"【{select_team}】のNG日を保存しました！")
+            st.success(f"【{select_team}】の {target_month} のNG日を保存（上書き）しました！")
             st.rerun()
 
     st.subheader("👀 現在の各チームのNG日登録状況")
@@ -173,7 +176,6 @@ with tab2:
         
         submit_slot = st.form_submit_button("💾 この枠をデータベースに保存する")
         if submit_slot:
-            # 重複を防ぐため、日付・時間枠・グラウンド名から固有のIDを作る
             generated_id = f"S_{slot_date}_{slot_time}_{slot_ground}"
             ym = str(slot_date)[:7] # YYYY-MM を抽出
             
@@ -181,7 +183,6 @@ with tab2:
                 "id": generated_id, "date": str(slot_date), "slot": slot_time,
                 "ground_name": slot_ground, "year_month": ym, "status": "未割り当て"
             }])
-            # 既存の同一IDがあれば上書き、なければ追加
             filtered_slots = slots_df[slots_df['id'] != generated_id]
             updated_slots_df = pd.concat([filtered_slots, new_slot_row], ignore_index=True)
             
@@ -196,7 +197,6 @@ with tab2:
     st.subheader("② 次月の日程自動作成の実行")
     target_month_sched = st.selectbox("作成する対象月を選択", ["2026-07", "2026-08", "2026-09"], index=1, key="sb_month")
     
-    # 対象月、かつ「未割り当て」のグラウンド枠をスプレッドシートから自動抽出
     current_month_slots = slots_df[(slots_df['year_month'] == target_month_sched) & (slots_df['status'] == "未割り当て")].copy()
     
     st.write(f"📊 現在スプレッドシートに保存されている **{target_month_sched} 分の未割り当て枠**: {len(current_month_slots)} 件")
@@ -206,7 +206,6 @@ with tab2:
         if current_month_slots.empty:
             st.error("自動生成に使用できる「未割り当て」のグラウンド枠がありません。先に上のフォームから枠を登録・保存してください。")
         else:
-            # アルゴリズム用に、マスタから「遠方フラグ」を紐付ける
             current_month_slots['is_far'] = current_month_slots['ground_name'].map(ground_is_far)
             slots_input_list = current_month_slots.to_dict('records')
             
@@ -214,21 +213,17 @@ with tab2:
             monthly_ng_df = ng_df[ng_df['year_month'] == target_month_sched]
             ng_days_dict = dict(zip(monthly_ng_df['team'], monthly_ng_df['ng_date']))
             
-            # 自動生成処理の実行
             new_sched_df, rem_pool_list, filled_slot_ids = make_monthly_schedule(
                 current_pool, slots_input_list, ng_days_dict, team_allow_far
             )
             
             if not new_sched_df.empty:
-                # 1. 確定スケジュールを更新
                 updated_sched_df = pd.concat([sched_df, new_sched_df], ignore_index=True)
                 conn.update(worksheet="schedule", data=updated_sched_df)
                 
-                # 2. 未消化試合プールを更新
                 updated_pool_df = pd.DataFrame(rem_pool_list, columns=['team1', 'team2'])
                 conn.update(worksheet="match_pool", data=updated_pool_df)
                 
-                # 3. 試合が組まれたグラウンド枠のステータスを「割り当て済み」に書き換え
                 slots_df.loc[slots_df['id'].isin(filled_slot_ids), 'status'] = '割り当て済み'
                 conn.update(worksheet="available_slots", data=slots_df)
                 st.cache_data.clear()
@@ -238,7 +233,6 @@ with tab2:
             else:
                 st.error("❌ 条件（各チームのNG日や遠方制限など）が厳しく、マッチングする組み合わせが見つかりませんでした。枠を増やすか調整してください。")
 
-    # 確定済みのスケジュール（LINE用のマップURL付き）
     if not sched_df.empty:
         st.subheader("🗓️ 確定スケジュール一覧")
         display_sched = sched_df.copy()
@@ -256,48 +250,52 @@ with tab3:
             existing_res = res_df[res_df['id'] == m_id]
             current_status = existing_res['status'].values[0] if not existing_res.empty else "未消化"
             
-            # 1. ステータスに応じた「絵文字」と「背景色・文字色（CSS）」の定義
             if current_status == "通常消化":
                 status_emoji = "🟢"
-                bg_color = "#e6f4ea"      # 黄緑（ライトグリーン）
-                text_color = "#137333"    # 濃い緑
+                bg_color = "#e6f4ea"
+                text_color = "#137333"
             elif current_status == "雨天中止":
                 status_emoji = "⚫"
-                bg_color = "#f1f3f4"      # 灰色（ライトグレー）
-                text_color = "#5f6368"    # 濃い灰色
+                bg_color = "#f1f3f4"
+                text_color = "#5f6368"
             elif current_status == "不戦敗":
                 status_emoji = "🟡"
-                bg_color = "#fef7e0"      # クリーム色（ライトイエロー）
-                text_color = "#b06000"    # 濃いブラウン
+                bg_color = "#fef7e0"
+                text_color = "#b06000"
             else:
                 status_emoji = "⚪"
-                bg_color = "#e8f0fe"      # 薄い青（未消化用）
-                text_color = "#1a73e8"    # 濃い青
+                bg_color = "#e8f0fe"
+                text_color = "#1a73e8"
             
-            # 2. タイトルの先頭にステータス絵文字を自動付与
             expander_title = f"{status_emoji} 【{row['date']} {row['slot']} @{row['ground_name']}】 {row['team1']} vs {row['team2']} (現在の状態: {current_status})"
             
             with st.expander(expander_title):
-                # 3. 指定された背景色でステータスバーを綺麗に表示
                 status_bar_html = f"""
-                <div style="
-                    background-color: {bg_color}; 
-                    color: {text_color}; 
-                    padding: 10px 12px; 
-                    border-radius: 5px; 
-                    margin-bottom: 15px; 
-                    font-weight: bold; 
-                    border-left: 6px solid {text_color};
-                ">
+                <div style="background-color: {bg_color}; color: {text_color}; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; border-left: 6px solid {text_color};">
                     {status_emoji} 現在のステータス: {current_status}
                 </div>
                 """
                 st.markdown(status_bar_html, unsafe_allow_html=True)
                 
-                # --- ここから下は既存の結果入力ロジック ---
+                # 【③・④改善】未消化・不戦敗を含むすべてのステータスを選択可能に
                 status = st.selectbox("試合ステータスを更新する", ["未消化", "通常消化", "雨天中止", "不戦敗"], key=f"st_{m_id}")
                 
-                if status == "通常消化":
+                # 【③・追加改善】「未消化」への更新処理
+                if status == "未消化":
+                    if st.button("結果を保存", key=f"save_unplayed_{m_id}"):
+                        # 確定状態から「未消化」に戻る場合は、resultsからスコアレコードを完全削除
+                        if current_status in ["通常消化", "不戦敗"]:
+                            updated_res_df = res_df[res_df['id'] != m_id]
+                        else:
+                            new_res = pd.DataFrame([{"id": m_id, "status": "未消化", "score": "-"}])
+                            updated_res_df = pd.concat([res_df[res_df['id'] != m_id], new_res], ignore_index=True)
+                        
+                        conn.update(worksheet="results", data=updated_res_df)
+                        st.cache_data.clear()
+                        st.success("ステータスを『未消化』に更新しました（スコアレコードはリセットされました）。")
+                        st.rerun()
+
+                elif status == "通常消化":
                     sc1 = st.number_input(f"{row['team1']} スコア", min_value=0, value=0, key=f"sc1_{m_id}")
                     sc2 = st.number_input(f"{row['team2']} スコア", min_value=0, value=0, key=f"sc2_{m_id}")
                     if st.button("結果を保存", key=f"save_{m_id}"):
@@ -308,6 +306,7 @@ with tab3:
                         st.success("試合結果を保存しました。")
                         st.rerun()
                         
+                # 【追加改善】「雨天中止」への更新処理
                 elif status == "雨天中止":
                     if st.button("🚨 雨天中止を確定して再試合プールへ戻す", key=f"rain_{m_id}"):
                         updated_sched_df = sched_df[sched_df['id'] != m_id]
@@ -319,9 +318,40 @@ with tab3:
                         
                         slots_df.loc[slots_df['id'] == m_id, 'status'] = '未割り当て'
                         conn.update(worksheet="available_slots", data=slots_df)
+                        
+                        # 確定状態から「雨天中止」になる場合は、resultsからスコアレコードを完全削除
+                        if current_status in ["通常消化", "不戦敗"]:
+                            updated_res_df = res_df[res_df['id'] != m_id]
+                        else:
+                            new_res = pd.DataFrame([{"id": m_id, "status": "雨天中止", "score": "-"}])
+                            updated_res_df = pd.concat([res_df[res_df['id'] != m_id], new_res], ignore_index=True)
+                        
+                        conn.update(worksheet="results", data=updated_res_df)
                         st.cache_data.clear()
                         
-                        st.success("スケジュールを削除し、対戦カードを最優先プールに戻しました。グラウンド枠も再利用可能です。")
+                        st.success("スケジュールを削除し、対戦カードをプールに戻しました。該当のスコアレコードも削除されました。")
+                        st.rerun()
+
+                # 【④・⑤改善】「不戦敗」への更新処理
+                elif status == "不戦敗":
+                    lose_team = st.radio(
+                        "どちらのチームが不戦敗（負け）となりましたか？", 
+                        [row['team1'], row['team2']], 
+                        key=f"lose_{m_id}"
+                    )
+                    
+                    if st.button("結果を保存", key=f"save_forfeit_{m_id}"):
+                        # 負けた方が0点、勝った方が10点
+                        if lose_team == row['team1']:
+                            final_score = "0-10"
+                        else:
+                            final_score = "10-0"
+                            
+                        new_res = pd.DataFrame([{"id": m_id, "status": "不戦敗", "score": final_score}])
+                        updated_res_df = pd.concat([res_df[res_df['id'] != m_id], new_res], ignore_index=True)
+                        conn.update(worksheet="results", data=updated_res_df)
+                        st.cache_data.clear()
+                        st.success(f"不戦敗の結果を保存しました。（スコア: {final_score}）")
                         st.rerun()
 
 # --- タブ4: 各種マスタデータの確認 ---
