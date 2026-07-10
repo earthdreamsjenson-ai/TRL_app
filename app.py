@@ -120,13 +120,14 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
     return pd.DataFrame(), match_list, []
 
 # ==========================================
-# 3. 画面UIレイアウト（4つのタブ）
+# 3. 画面UIレイアウト（5つのタブに拡張）
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📅 NG日登録", 
     "🛠️ グラウンド枠登録・日程作成", 
     "🏆 試合結果入力", 
-    "⚙️ マスタ・データ確認"
+    "⚙️ マスタ・データ確認",
+    "📊 残試合数確認"
 ])
 
 # --- タブ1: NG日登録 ---
@@ -493,9 +494,7 @@ with tab3:
                         st.success(f"不戦敗の結果を保存しました。（スコア: {final_score}）")
                         st.rerun()
 
-# ==========================================
-# 5. 各種マスタデータの確認（タブ4）
-# ==========================================
+# --- タブ4: 各種マスタデータの確認 ---
 with tab4:
     st.header("⚙️ マスタ・データ確認")
     c1, c2 = st.columns(2)
@@ -509,3 +508,33 @@ with tab4:
         st.dataframe(teams_df)
         st.subheader("🔥 残りの未消化試合プール")
         st.dataframe(pool_df)
+
+# --- タブ5: 各チームの残試合数確認【新設機能】 ---
+with tab5:
+    st.header("📊 各チームの残試合数確認")
+    st.markdown("リーグ全体の残り試合数の集計状況です。残試合数が多い順に表示しています。")
+
+    remaining_data = []
+    # 既に消化済み（通常消化または不戦敗）の試合IDリストを取得
+    finished_ids = res_df[res_df['status'].isin(['通常消化', '不戦敗'])]['id'].tolist() if not res_df.empty else []
+
+    for team in all_teams:
+        # 1. 未日程の試合数 (match_pool に残っている対戦)
+        unallocated = ((pool_df['team1'] == team) | (pool_df['team2'] == team)).sum() if not pool_df.empty else 0
+        
+        # 2. 日程確定済・結果未消化の試合数 (schedule にあり、結果に「通常消化/不戦敗」が登録されていないもの)
+        allocated_unplayed = 0
+        if not sched_df.empty:
+            unplayed_sched = sched_df[~sched_df['id'].isin(finished_ids)]
+            allocated_unplayed = ((unplayed_sched['team1'] == team) | (unplayed_sched['team2'] == team)).sum()
+        
+        remaining_data.append({
+            "チーム名": team,
+            "総残試合数": unallocated + allocated_unplayed,
+            "未日程 (プール内)": unallocated,
+            "日程確定済 (未消化)": allocated_unplayed
+        })
+
+    # データフレームに変換し、総残試合数が多い順にソートして表示
+    remaining_df = pd.DataFrame(remaining_data).sort_values(by="総残試合数", ascending=False)
+    st.dataframe(remaining_df, use_container_width=True, hide_index=True)
