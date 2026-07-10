@@ -243,16 +243,29 @@ with tab3:
             current_status = existing_res['status'].values[0] if not existing_res.empty else "未消化"
             current_score = existing_res['score'].values[0] if not existing_res.empty else "-"
             
-            # ステータステキストの初期定義
             status_display_text = f"現在のステータス: {current_status}"
             
-            # ステータスに応じた「絵文字」「背景色・文字色」および【追加改善：詳細情報の可視化】
+            # ステータスに応じた「絵文字」「背景色・文字色」および詳細可視化ロジック
             if current_status == "通常消化":
                 status_emoji = "🟢"
                 bg_color = "#e6f4ea"      # 黄緑
                 text_color = "#137333"
-                # 【改善】登録されているスコアを明記
-                status_display_text += f" (登録スコア: {current_score})"
+                
+                # 【追加改善】通常消化のスコアを解析して ○ × 判定を表示
+                try:
+                    if "-" in str(current_score):
+                        s1_str, s2_str = str(current_score).split("-")
+                        s1, s2 = int(s1_str), int(s2_str)
+                        if s1 > s2:
+                            status_display_text += f" (⭕ 勝者: {row['team1']} [{s1}] / ❌ 敗者: {row['team2']} [{s2}])"
+                        elif s2 > s1:
+                            status_display_text += f" (❌ 敗者: {row['team1']} [{s1}] / ⭕ 勝者: {row['team2']} [{s2}])"
+                        else:
+                            status_display_text += f" (🔺 引き分け: {row['team1']} [{s1}] - [{s2}] {row['team2']})"
+                    else:
+                        status_display_text += f" (スコア: {current_score})"
+                except Exception:
+                    status_display_text += f" (スコア: {current_score})"
                 
             elif current_status == "雨天中止":
                 status_emoji = "⚫"
@@ -263,11 +276,10 @@ with tab3:
                 status_emoji = "🟡"
                 bg_color = "#fef7e0"      # クリーム色
                 text_color = "#b06000"
-                # 【改善】スコアからどちらのチームが負けたかを自動判定して明記
                 if current_score == "0-10":
-                    status_display_text += f" (❌ 敗戦: {row['team1']} / ⭕ 不戦勝: {row['team2']})"
+                    status_display_text += f" (❌ 不戦敗: {row['team1']} / ⭕ 不戦勝: {row['team2']})"
                 elif current_score == "10-0":
-                    status_display_text += f" (⭕ 不戦勝: {row['team1']} / ❌ 敗戦: {row['team2']})"
+                    status_display_text += f" (⭕ 不戦勝: {row['team1']} / ❌ 不戦敗: {row['team2']})"
                 else:
                     status_display_text += f" (スコア: {current_score})"
             else:
@@ -285,7 +297,6 @@ with tab3:
                 """
                 st.markdown(status_bar_html, unsafe_allow_html=True)
                 
-                # すべてのステータスをプルダウンで選択可能
                 status = st.selectbox("試合ステータスを更新する", ["未消化", "通常消化", "雨天中止", "不戦敗"], key=f"st_{m_id}")
                 
                 # 「未消化」への更新処理
