@@ -869,6 +869,11 @@ with tab4:
         
         sorted_teams_by_league = teams_df.sort_values(by=['league', 'team'])['team'].tolist()
         
+        pool_matches = set()
+        if not pool_df.empty:
+            for _, row in pool_df.iterrows():
+                pool_matches.add((row['team1'], row['team2']))
+                
         match_map = {}
         for m in processed_matches:
             match_map[(m['team1'], m['team2'])] = m
@@ -1004,7 +1009,10 @@ with tab4:
                 else:
                     match = match_map.get((t1, t2))
                     if match is None:
-                        html += '<td class="cell-diagonal">＼</td>'
+                        if (t1, t2) in pool_matches:
+                            html += '<td class="cell-none">-</td>'
+                        else:
+                            html += '<td class="cell-diagonal"></td>'
                     else:
                         status = match['status']
                         score_str = match['score']
