@@ -901,9 +901,14 @@ with tab4:
             color: #3c4043;
             font-weight: 600;
         }
-        .matrix-table th.header-team {
-            background-color: #e8f0fe;
-            color: #1a73e8;
+        .matrix-table th.header-team-a {
+            background-color: #e8f0fe !important;
+            color: #1a73e8 !important;
+            font-weight: bold;
+        }
+        .matrix-table th.header-team-b {
+            background-color: #fef7e0 !important;
+            color: #b06000 !important;
             font-weight: bold;
         }
         .matrix-table th.corner {
@@ -977,8 +982,9 @@ with tab4:
         
         for t in sorted_teams_by_league:
             l = team_leagues.get(t, '')
+            header_class = 'header-team-a' if l == 'A' else 'header-team-b'
             badge_class = 'badge-a' if l == 'A' else 'badge-b'
-            html += f'<th class="header-team">{t}<br><span class="badge-league {badge_class}">L-{l}</span></th>'
+            html += f'<th class="{header_class}">{t}<br><span class="badge-league {badge_class}">L-{l}</span></th>'
             
         html += """
             </tr>
@@ -988,8 +994,9 @@ with tab4:
         
         for t1 in sorted_teams_by_league:
             l1 = team_leagues.get(t1, '')
+            header_class1 = 'header-team-a' if l1 == 'A' else 'header-team-b'
             badge_class1 = 'badge-a' if l1 == 'A' else 'badge-b'
-            html += f'<tr><th class="header-team" style="text-align: left; padding-left: 12px;">{t1} <span class="badge-league {badge_class1}">L-{l1}</span></th>'
+            html += f'<tr><th class="{header_class1}" style="text-align: left; padding-left: 12px;">{t1} <span class="badge-league {badge_class1}">L-{l1}</span></th>'
             
             for t2 in sorted_teams_by_league:
                 if t1 == t2:
@@ -997,7 +1004,7 @@ with tab4:
                 else:
                     match = match_map.get((t1, t2))
                     if match is None:
-                        html += '<td class="cell-none">-</td>'
+                        html += '<td class="cell-diagonal">＼</td>'
                     else:
                         status = match['status']
                         score_str = match['score']
