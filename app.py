@@ -42,6 +42,205 @@ ground_is_far = dict(zip(grounds_df['name'], grounds_df['is_far']))
 ground_maps = dict(zip(grounds_df['name'], grounds_df['maps_url']))
 
 # ==========================================
+# 1.5 順位計算・総当たり表用ヘルパー関数
+# ==========================================
+def get_processed_matches(sched_df, res_df):
+    processed = []
+    res_dict = {}
+    if not res_df.empty:
+        res_dict = res_df.set_index('id').to_dict('index')
+        
+    for _, row in sched_df.iterrows():
+        m_id = row['id']
+        t1 = row['team1']
+        t2 = row['team2']
+        
+        res = res_dict.get(m_id, {'status': '未消化', 'score': '-'})
+        status = res.get('status', '未消化')
+        score_str = str(res.get('score', '-'))
+        
+        match_info = {
+            'id': m_id,
+            'date': row.get('date', ''),
+            'ground_name': row.get('ground_name', ''),
+            'team1': t1,
+            'team2': t2,
+            'status': status,
+            'score': score_str,
+            'played': False,
+            'score1': 0,
+            'score2': 0,
+            'winner': None,
+            'loser': None,
+            'is_draw': False
+        }
+        
+        if status == '通常消化':
+            try:
+                if '-' in score_str:
+                    s1_str, s2_str = score_str.split('-')
+                    s1, s2 = int(s1_str), int(s2_str)
+                    match_info['score1'] = s1
+                    match_info['score2'] = s2
+                    match_info['played'] = True
+                    if s1 > s2:
+                        match_info['winner'] = t1
+                        match_info['loser'] = t2
+                    elif s1 < s2:
+                        match_info['winner'] = t2
+                        match_info['loser'] = t1
+                    else:
+                        match_info['is_draw'] = True
+            except Exception:
+                pass
+                
+        elif status == '不戦敗':
+            try:
+                if '-' in score_str:
+                    s1_str, s2_str = score_str.split('-')
+                    s1, s2 = int(s1_str), int(s2_str)
+                    match_info['score1'] = s1
+                    match_info['score2'] = s2
+                    match_info['played'] = True
+                    if s1 > s2:
+                        match_info['winner'] = t1
+                        match_info['loser'] = t2
+                    elif s1 < s2:
+                        match_info['winner'] = t2
+                        match_info['loser'] = t1
+            except Exception:
+                pass
+                
+        processed.append(match_info)
+        
+    return processed
+
+def calculate_standings(teams, matches):
+    stats = {}
+    for team in teams:
+        stats[team] = {
+            'team': team,
+            'played': 0,
+            'wins': 0,
+            'losses': 0,
+            'draws': 0,
+            'win_pct': 0.0,
+            'goals_for': 0,
+            'goals_against': 0,
+            'goal_diff': 0,
+        }
+        
+    for m in matches:
+        if not m['played']:
+            continue
+        t1, t2 = m['team1'], m['team2']
+        if t1 not in stats or t2 not in stats:
+            continue
+        
+        stats[t1]['played'] += 1
+        stats[t2]['played'] += 1
+        
+        s1, s2 = m['score1'], m['score2']
+        stats[t1]['goals_for'] += s1
+        stats[t1]['goals_against'] += s2
+        stats[t2]['goals_for'] += s2
+        stats[t2]['goals_against'] += s1
+        
+        if m['is_draw']:
+            stats[t1]['draws'] += 1
+            stats[t2]['draws'] += 1
+        elif m['winner'] == t1:
+            stats[t1]['wins'] += 1
+            stats[t2]['losses'] += 1
+        elif m['winner'] == t2:
+            stats[t2]['wins'] += 1
+            stats[t1]['losses'] += 1
+
+    for team in teams:
+        w = stats[team]['wins']
+        l = stats[team]['losses']
+        if w + l > 0:
+            stats[team]['win_pct'] = w / (w + l)
+        else:
+            stats[team]['win_pct'] = 0.0
+        stats[team]['goal_diff'] = stats[team]['goals_for'] - stats[team]['goals_against']
+
+    # 一次ソート（勝率 -> 勝ち数 -> 得失点差）
+    sorted_teams = sorted(
+        teams,
+        key=lambda t: (stats[t]['win_pct'], stats[t]['wins'], stats[t]['goal_diff']),
+        reverse=True
+    )
+    
+    # 同率グループの特定と直接対決（H2H）による決定
+    def get_group_key(t):
+        return (stats[t]['win_pct'], stats[t]['wins'], stats[t]['goal_diff'])
+    
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for t in sorted_teams:
+        groups[get_group_key(t)].append(t)
+        
+    final_sorted_teams = []
+    sorted_group_keys = sorted(groups.keys(), reverse=True)
+    for g_key in sorted_group_keys:
+        group = groups[g_key]
+        if len(group) == 1:
+            final_sorted_teams.append(group[0])
+        else:
+            resolved_group = resolve_head_to_head(group, matches)
+            final_sorted_teams.extend(resolved_group)
+            
+    standings = []
+    for idx, team in enumerate(final_sorted_teams):
+        t_stats = stats[team].copy()
+        t_stats['rank'] = idx + 1
+        standings.append(t_stats)
+        
+    return standings
+
+def resolve_head_to_head(group_teams, matches):
+    set_teams = set(group_teams)
+    h2h_stats = {t: {'wins': 0, 'losses': 0, 'draws': 0, 'goals_for': 0, 'goals_against': 0, 'win_pct': 0.0, 'goal_diff': 0} for t in group_teams}
+    
+    for m in matches:
+        if not m['played']:
+            continue
+        t1, t2 = m['team1'], m['team2']
+        if t1 in set_teams and t2 in set_teams:
+            s1, s2 = m['score1'], m['score2']
+            h2h_stats[t1]['goals_for'] += s1
+            h2h_stats[t1]['goals_against'] += s2
+            h2h_stats[t2]['goals_for'] += s2
+            h2h_stats[t2]['goals_against'] += s1
+            
+            if m['is_draw']:
+                h2h_stats[t1]['draws'] += 1
+                h2h_stats[t2]['draws'] += 1
+            elif m['winner'] == t1:
+                h2h_stats[t1]['wins'] += 1
+                h2h_stats[t2]['losses'] += 1
+            elif m['winner'] == t2:
+                h2h_stats[t2]['wins'] += 1
+                h2h_stats[t1]['losses'] += 1
+
+    for t in group_teams:
+        w = h2h_stats[t]['wins']
+        l = h2h_stats[t]['losses']
+        if w + l > 0:
+            h2h_stats[t]['win_pct'] = w / (w + l)
+        else:
+            h2h_stats[t]['win_pct'] = 0.0
+        h2h_stats[t]['goal_diff'] = h2h_stats[t]['goals_for'] - h2h_stats[t]['goals_against']
+        
+    sorted_group = sorted(
+        group_teams,
+        key=lambda t: (h2h_stats[t]['win_pct'], h2h_stats[t]['wins'], h2h_stats[t]['goal_diff']),
+        reverse=True
+    )
+    return sorted_group
+
+# ==========================================
 # 2. 日程自動作成ロジック
 # ==========================================
 def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
@@ -133,10 +332,11 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
 # ==========================================
 # 3. 画面UIレイアウト
 # ==========================================
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📅 NG日登録", 
     "🛠️ グラウンド枠・日程作成", 
     "🏆 試合結果入力", 
+    "🏆 順位表・総当たり表",
     "📊 残試合数確認",
     "⚙️ マスタメンテ・データ確認"
 ])
@@ -545,8 +745,303 @@ with tab3:
                         st.success(f"不戦敗の結果を保存しました。（スコア: {final_score}）")
                         st.rerun()
 
-# --- タブ4: 残試合数確認 ---
+# --- タブ4: 順位表・総当たり表 ---
 with tab4:
+    st.header("🏆 順位表・総当たり表")
+    
+    # 試合結果データのパース
+    processed_matches = get_processed_matches(sched_df, res_df)
+    
+    # サブタブ作成
+    sub_tab1, sub_tab2, sub_tab3 = st.tabs([
+        "🏆 リーグ別順位",
+        "🌎 総合順位",
+        "📊 総当たり表 (マトリックス)"
+    ])
+    
+    # チームマスタからリーグ情報を取得
+    team_leagues = dict(zip(teams_df['team'], teams_df['league']))
+    
+    with sub_tab1:
+        st.subheader("🏆 リーグ別順位表")
+        st.caption("※ リーグ内対戦（同じリーグ同士のチームの試合）のみが集計対象となります。")
+        
+        # リーグ一覧を取得
+        leagues = sorted(list(teams_df['league'].dropna().unique()))
+        selected_league = st.selectbox("表示するリーグを選択してください", leagues, key="select_league")
+        
+        # 選択されたリーグのチーム
+        league_teams = teams_df[teams_df['league'] == selected_league]['team'].tolist()
+        
+        # リーグ内の試合のみ抽出
+        league_matches = [
+            m for m in processed_matches
+            if m['team1'] in league_teams and m['team2'] in league_teams
+        ]
+        
+        # 順位計算
+        standings_l = calculate_standings(league_teams, league_matches)
+        standings_l_df = pd.DataFrame(standings_l)
+        
+        if not standings_l_df.empty:
+            standings_l_df = standings_l_df.rename(columns={
+                'rank': '順位',
+                'team': 'チーム名',
+                'played': '試合数',
+                'wins': '勝',
+                'losses': '敗',
+                'draws': '分',
+                'win_pct': '勝率',
+                'goals_for': '得点',
+                'goals_against': '失点',
+                'goal_diff': '得失点差'
+            })
+            
+            st.dataframe(
+                standings_l_df[['順位', 'チーム名', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "順位": st.column_config.NumberColumn("順位", width=60),
+                    "試合数": st.column_config.NumberColumn("試合数", width=70),
+                    "勝": st.column_config.NumberColumn("勝", width=60),
+                    "敗": st.column_config.NumberColumn("敗", width=60),
+                    "分": st.column_config.NumberColumn("分", width=60),
+                    "勝率": st.column_config.NumberColumn("勝率", format="%.3f", width=80),
+                    "得点": st.column_config.NumberColumn("得点", width=70),
+                    "失点": st.column_config.NumberColumn("失点", width=70),
+                    "得失点差": st.column_config.NumberColumn("得失点差", width=90)
+                }
+            )
+        else:
+            st.info("データがありません。")
+
+    with sub_tab2:
+        st.subheader("🌎 総合順位表")
+        st.caption("※ インターリーグ（リーグ外対戦）も含めた全試合の対戦成績に基づきます。")
+        
+        # 全試合
+        all_teams_list = teams_df['team'].tolist()
+        standings_g = calculate_standings(all_teams_list, processed_matches)
+        standings_g_df = pd.DataFrame(standings_g)
+        
+        if not standings_g_df.empty:
+            standings_g_df['リーグ'] = standings_g_df['team'].map(team_leagues)
+            standings_g_df = standings_g_df.rename(columns={
+                'rank': '順位',
+                'team': 'チーム名',
+                'played': '試合数',
+                'wins': '勝',
+                'losses': '敗',
+                'draws': '分',
+                'win_pct': '勝率',
+                'goals_for': '得点',
+                'goals_against': '失点',
+                'goal_diff': '得失点差'
+            })
+            
+            st.dataframe(
+                standings_g_df[['順位', 'チーム名', 'リーグ', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "順位": st.column_config.NumberColumn("順位", width=60),
+                    "リーグ": st.column_config.TextColumn("リーグ", width=80),
+                    "試合数": st.column_config.NumberColumn("試合数", width=70),
+                    "勝": st.column_config.NumberColumn("勝", width=60),
+                    "敗": st.column_config.NumberColumn("敗", width=60),
+                    "分": st.column_config.NumberColumn("分", width=60),
+                    "勝率": st.column_config.NumberColumn("勝率", format="%.3f", width=80),
+                    "得点": st.column_config.NumberColumn("得点", width=70),
+                    "失点": st.column_config.NumberColumn("失点", width=70),
+                    "得失点差": st.column_config.NumberColumn("得失点差", width=90)
+                }
+            )
+        else:
+            st.info("データがありません。")
+
+    with sub_tab3:
+        st.subheader("📊 全試合対戦総当たり表 (マトリックス)")
+        st.markdown("""
+        - **行が「ホームチーム（後攻）」**、**列が「アウェイチーム（先攻）」**となります。
+        - リーグ内対戦（総当たり2回）は2箇所、インターリーグ（総当たり1回）は設定された1箇所のみ表示されます。
+        """)
+        
+        sorted_teams_by_league = teams_df.sort_values(by=['league', 'team'])['team'].tolist()
+        
+        match_map = {}
+        for m in processed_matches:
+            match_map[(m['team1'], m['team2'])] = m
+            
+        html = """
+        <style>
+        .matrix-container {
+            overflow-x: auto;
+            margin: 15px 0;
+            padding: 5px;
+        }
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Outfit', 'Inter', 'Helvetica Neue', sans-serif;
+            font-size: 14px;
+            text-align: center;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .matrix-table th, .matrix-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 8px;
+            min-width: 90px;
+            vertical-align: middle;
+        }
+        .matrix-table th {
+            background-color: #f8f9fa;
+            color: #3c4043;
+            font-weight: 600;
+        }
+        .matrix-table th.header-team {
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            font-weight: bold;
+        }
+        .matrix-table th.corner {
+            background-color: #f1f3f4;
+            font-size: 11px;
+            color: #5f6368;
+            width: 110px;
+        }
+        .cell-diagonal {
+            background-color: #e8eaed !important;
+            color: #9aa0a6;
+            font-size: 16px;
+        }
+        .cell-none {
+            background-color: #f1f3f4 !important;
+            color: #bdc1c6;
+            font-size: 12px;
+        }
+        .cell-win {
+            background-color: #e6f4ea !important;
+            color: #137333 !important;
+            font-weight: bold;
+        }
+        .cell-loss {
+            background-color: #fce8e6 !important;
+            color: #c5221f !important;
+        }
+        .cell-draw {
+            background-color: #fef7e0 !important;
+            color: #b06000 !important;
+            font-weight: bold;
+        }
+        .cell-unplayed {
+            background-color: #e8f0fe !important;
+            color: #1a73e8 !important;
+            font-size: 11px;
+            line-height: 1.2;
+        }
+        .cell-info {
+            display: block;
+            font-size: 11px;
+            margin-top: 3px;
+            font-weight: normal;
+            opacity: 0.85;
+        }
+        .badge-league {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 10px;
+            border-radius: 4px;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+        .badge-a {
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            border: 1px solid #1a73e8;
+        }
+        .badge-b {
+            background-color: #fef7e0;
+            color: #b06000;
+            border: 1px solid #b06000;
+        }
+        </style>
+        <div class="matrix-container">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th class="corner">H \\ A<br>(ホーム＼アウェイ)</th>
+        """
+        
+        for t in sorted_teams_by_league:
+            l = team_leagues.get(t, '')
+            badge_class = 'badge-a' if l == 'A' else 'badge-b'
+            html += f'<th class="header-team">{t}<br><span class="badge-league {badge_class}">L-{l}</span></th>'
+            
+        html += """
+            </tr>
+          </thead>
+          <tbody>
+        """
+        
+        for t1 in sorted_teams_by_league:
+            l1 = team_leagues.get(t1, '')
+            badge_class1 = 'badge-a' if l1 == 'A' else 'badge-b'
+            html += f'<tr><th class="header-team" style="text-align: left; padding-left: 12px;">{t1} <span class="badge-league {badge_class1}">L-{l1}</span></th>'
+            
+            for t2 in sorted_teams_by_league:
+                if t1 == t2:
+                    html += '<td class="cell-diagonal">＼</td>'
+                else:
+                    match = match_map.get((t1, t2))
+                    if match is None:
+                        html += '<td class="cell-none">-</td>'
+                    else:
+                        status = match['status']
+                        score_str = match['score']
+                        
+                        if status == '通常消化':
+                            s1, s2 = match['score1'], match['score2']
+                            if s1 > s2:
+                                html += f'<td class="cell-win">○<span class="cell-info">{s1}-{s2}</span></td>'
+                            elif s1 < s2:
+                                html += f'<td class="cell-loss">×<span class="cell-info">{s1}-{s2}</span></td>'
+                            else:
+                                html += f'<td class="cell-draw">△<span class="cell-info">{s1}-{s2}</span></td>'
+                                
+                        elif status == '不戦敗':
+                            s1, s2 = match['score1'], match['score2']
+                            if s1 > s2:
+                                html += '<td class="cell-win">○<span class="cell-info">不戦勝</span></td>'
+                            else:
+                                html += '<td class="cell-loss">×<span class="cell-info">不戦敗</span></td>'
+                                
+                        elif status == '雨天中止':
+                            html += '<td class="cell-none">中止</td>'
+                            
+                        else:
+                            date_val = match.get('date', '')
+                            try:
+                                formatted_date = datetime.strptime(date_val, "%Y-%m-%d").strftime("%m/%d")
+                            except Exception:
+                                formatted_date = date_val[5:10].replace('-', '/') if len(date_val) >= 10 else date_val
+                                
+                            g_name = match.get('ground_name', '')
+                            html += f'<td class="cell-unplayed">未<span class="cell-info">{formatted_date}<br>{g_name}</span></td>'
+            html += '</tr>'
+            
+        html += """
+          </tbody>
+        </table>
+        </div>
+        """
+        
+        st.markdown(html, unsafe_allow_html=True)
+
+# --- タブ5: 残試合数確認 ---
+with tab5:
     st.header("📊 残試合数確認")
     st.subheader("🔥 未消化試合")
     st.dataframe(pool_df, use_container_width=True)
@@ -580,8 +1075,8 @@ with tab4:
     remaining_df = pd.DataFrame(remaining_data).sort_values(by="総残試合数", ascending=False)
     st.dataframe(remaining_df, use_container_width=True, hide_index=True)
 
-# --- タブ5: マスタメンテナンス ---
-with tab5:
+# --- タブ6: マスタメンテナンス ---
+with tab6:
     st.header("⚙️ マスタメンテ・データ確認")
     m_tab1, m_tab2, m_tab3 = st.tabs(["🏟️ グラウンドマスタ編集", "🏃 チームマスタ編集", "📋 確保枠確認"])
     
