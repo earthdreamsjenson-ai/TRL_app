@@ -379,7 +379,7 @@ with tab1:
             st.rerun()
 
     st.subheader("👀 NG日登録状況")
-    st.dataframe(ng_df, use_container_width=True)
+    st.dataframe(ng_df, width="stretch")
 
 # --- タブ2: グラウンド枠登録 ＆ 日程自動作成 ---
 with tab2:
@@ -424,7 +424,7 @@ with tab2:
         edited_df = st.data_editor(
             input_template, 
             num_rows="dynamic", 
-            use_container_width=True,
+            width="stretch",
             column_config={
                 "date": st.column_config.DateColumn("確保した日付", required=True),
                 "slot": st.column_config.SelectboxColumn("時間枠", options=[
@@ -510,7 +510,7 @@ with tab2:
                     st.error(f"❌ CSVファイルのヘッダーが正しくありません。 {required_cols} を含めてください。")
                 else:
                     st.write("📋 アップロードデータのプレビュー:")
-                    st.dataframe(uploaded_df, use_container_width=True)
+                    st.dataframe(uploaded_df, width="stretch")
                     
                     if st.button("💾 CSVのデータをデータベースに保存する", type="primary", key="bulk_save_csv"):
                         valid_df = uploaded_df.dropna(subset=["date", "slot", "ground_name"]).copy()
@@ -539,7 +539,7 @@ with tab2:
     current_month_slots = slots_df[(slots_df['year_month'] == target_month_sched) & (slots_df['status'] == "未割り当て")].copy()
     
     st.write(f"📊 現在スプレッドシートに保存されている **{target_month_sched} 分の未割り当て枠**: {len(current_month_slots)} 件")
-    st.dataframe(current_month_slots, use_container_width=True)
+    st.dataframe(current_month_slots, width="stretch")
     
     if st.button("🔥 保存された枠を元に日程を自動生成する", type="primary"):
         if current_month_slots.empty:
@@ -576,7 +576,7 @@ with tab2:
         st.subheader("🗓️ 確定スケジュール一覧")
         display_sched = sched_df.copy()
         display_sched['GoogleMap_URL'] = display_sched['ground_name'].map(ground_maps)
-        st.dataframe(display_sched, use_container_width=True)
+        st.dataframe(display_sched, width="stretch")
 
         # 📱 LINEグループ送信用のテキスト作成
         st.markdown("---")
@@ -799,7 +799,7 @@ with tab4:
             
             st.dataframe(
                 standings_l_df[['順位', 'チーム名', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 column_config={
                     "順位": st.column_config.NumberColumn("順位", width=60),
@@ -842,7 +842,7 @@ with tab4:
             
             st.dataframe(
                 standings_g_df[['順位', 'チーム名', 'リーグ', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 column_config={
                     "順位": st.column_config.NumberColumn("順位", width=60),
@@ -1059,7 +1059,7 @@ with tab4:
 with tab5:
     st.header("📊 残試合数確認")
     st.subheader("🔥 未消化試合")
-    st.dataframe(pool_df, use_container_width=True)
+    st.dataframe(pool_df, width="stretch")
     
     st.markdown("リーグ全体の残り試合数の集計状況です。")
     today_str = datetime.now().strftime('%Y-%m-%d')
@@ -1088,7 +1088,7 @@ with tab5:
             "日程済 (未来の未消化)": future_unplayed
         })
     remaining_df = pd.DataFrame(remaining_data).sort_values(by="総残試合数", ascending=False)
-    st.dataframe(remaining_df, use_container_width=True, hide_index=True)
+    st.dataframe(remaining_df, width="stretch", hide_index=True)
 
 # --- タブ6: マスタメンテナンス ---
 with tab6:
@@ -1100,7 +1100,7 @@ with tab6:
         grounds_df["is_far"] = grounds_df["is_far"].fillna(False).astype(bool)
         grounds_df["maps_url"] = grounds_df["maps_url"].fillna("").astype(str)
         
-        edited_grounds_df = st.data_editor(grounds_df, num_rows="dynamic", use_container_width=True, key="master_grounds_editor", column_config={
+        edited_grounds_df = st.data_editor(grounds_df, num_rows="dynamic", width="stretch", key="master_grounds_editor", column_config={
             "name": st.column_config.TextColumn("グラウンド名", required=True),
             "is_far": st.column_config.CheckboxColumn("遠方フラグ"),
             "maps_url": st.column_config.TextColumn("GoogleMap URL")
@@ -1113,7 +1113,7 @@ with tab6:
         # 型の再キャスト（エラー回避）
         teams_df["allow_far"] = teams_df["allow_far"].fillna(False).astype(bool)
         
-        edited_teams_df = st.data_editor(teams_df, num_rows="dynamic", use_container_width=True, key="master_teams_editor", column_config={
+        edited_teams_df = st.data_editor(teams_df, num_rows="dynamic", width="stretch", key="master_teams_editor", column_config={
             "team": st.column_config.TextColumn("チーム名", required=True),
             "allow_far": st.column_config.CheckboxColumn("遠方対応可否")
         })
@@ -1123,4 +1123,4 @@ with tab6:
 
     with m_tab3:
         st.subheader("📋 確保グラウンド枠の全履歴")
-        st.dataframe(slots_df, use_container_width=True)
+        st.dataframe(slots_df, width="stretch")

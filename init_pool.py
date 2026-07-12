@@ -31,7 +31,7 @@ except Exception as e:
 # 2. 読み込みに成功した場合のみ、以下の画面表示と生成ボタンの処理を行う
 if teams_df is not None:
     st.subheader("🏃 現在登録されているチームマスタ")
-    st.dataframe(teams_df, use_container_width=True)
+    st.dataframe(teams_df, width="stretch")
 
     st.markdown("---")
     st.subheader("🔥 対戦プールの生成と書き込み")
@@ -100,10 +100,10 @@ if teams_df is not None:
                     # 📊 均等に分かれているか検証データを画面に表示
                     st.subheader("📊 各チームの年間ホーム試合数チェック (全チーム 5 になっていれば大成功)")
                     home_counts = pool_df['team1'].value_counts().to_frame().rename(columns={'count': 'ホーム試合数（後攻）'})
-                    st.dataframe(home_counts, use_container_width=True)
+                    st.dataframe(home_counts, width="stretch")
                     
                     st.subheader("👀 生成された全対戦カード（1〜40試合）")
-                    st.dataframe(pool_df, use_container_width=True)
+                    st.dataframe(pool_df, width="stretch")
                 
                 except Exception as update_error:
                     st.error(f"❌ スプレッドシートへの書き込みに失敗しました。`match_pool` という名前のシート（タブ）が本当に存在するか確認してください。")
