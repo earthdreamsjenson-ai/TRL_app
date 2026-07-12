@@ -8,6 +8,53 @@ import re
 import csv
 import io
 
+def _raw_read(_client, url: str, worksheet: str, spreadsheet_id: str) -> pd.DataFrame:
+    # 1. Try using authorized gspread client if it was successfully initialized
+    if _client:
+        try:
+            sh = _client.open_by_url(url)
+            ws = sh.worksheet(worksheet)
+            data = ws.get_all_values()
+            if not data:
+                return pd.DataFrame()
+            
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerows(data)
+            output.seek(0)
+            return pd.read_csv(output)
+        except Exception as e:
+            # Fallback
+            pass
+
+    # 2. Public spreadsheet loading fallback using pandas read_csv
+    if spreadsheet_id:
+        try:
+            csv_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&sheet={worksheet}"
+            return pd.read_csv(csv_url)
+        except Exception as e:
+            raise RuntimeError(f"Failed to read sheet {worksheet} from public URL: {e}")
+    else:
+        raise ValueError(f"Could not parse spreadsheet ID from URL: {url}")
+
+@st.cache_data(show_spinner=False)
+def _cached_read(_client, url: str, worksheet: str, spreadsheet_id: str) -> pd.DataFrame:
+    return _raw_read(_client, url, worksheet, spreadsheet_id)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _cached_read_ttl(_client, url: str, worksheet: str, spreadsheet_id: str) -> pd.DataFrame:
+    return _raw_read(_client, url, worksheet, spreadsheet_id)
+
+def clear_all_caches():
+    try:
+        _cached_read.clear()
+    except Exception:
+        pass
+    try:
+        _cached_read_ttl.clear()
+    except Exception:
+        pass
+
 class GSheetsConnection(BaseConnection[gspread.Client]):
     def _connect(self, **kwargs) -> gspread.Client:
         # Resolve secrets
@@ -64,35 +111,17 @@ class GSheetsConnection(BaseConnection[gspread.Client]):
         if match:
             spreadsheet_id = match.group(1)
 
-        # 1. gspreadでの読み込み（認証情報がある場合）
-        client = self._instance
-        if client:
-            try:
-                sh = client.open_by_url(url)
-                ws = sh.worksheet(worksheet)
-                data = ws.get_all_values()
-                if not data:
-                    return pd.DataFrame()
-                
-                # StringIOとpd.read_csvを利用して、型変換と空白行除去を標準のread_csvと統一
-                output = io.StringIO()
-                writer = csv.writer(output)
-                writer.writerows(data)
-                output.seek(0)
-                return pd.read_csv(output)
-            except Exception as e:
-                # 読み込みに失敗した場合はパブリック経由でのフォールバックを試みる
-                pass
-
-        # 2. パブリックURL経由での読み込み（認証情報がない場合）
-        if spreadsheet_id:
-            try:
-                csv_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&sheet={worksheet}"
-                return pd.read_csv(csv_url)
-            except Exception as e:
-                raise RuntimeError(f"パブリックURLからシート '{worksheet}' の読み込みに失敗しました: {e}")
+        # Handle ttl and caching
+        if ttl == 0:
+            return _raw_read(self._instance, url, worksheet, spreadsheet_id)
+        elif ttl == 600:
+            return _cached_read_ttl(self._instance, url, worksheet, spreadsheet_id)
+        elif ttl is not None and ttl > 0:
+            # Fallback for dynamic non-zero TTL
+            cached_func = st.cache_data(ttl=ttl, show_spinner=False)(_raw_read)
+            return cached_func(self._instance, url, worksheet, spreadsheet_id)
         else:
-            raise ValueError(f"スプレッドシートURLからIDをパースできませんでした: {url}")
+            return _cached_read(self._instance, url, worksheet, spreadsheet_id)
 
     def update(self, worksheet: str = None, spreadsheet: str = None, data: pd.DataFrame = None, **kwargs):
         # Determine the spreadsheet URL
@@ -124,3 +153,6 @@ class GSheetsConnection(BaseConnection[gspread.Client]):
 
         # Write data
         set_with_dataframe(ws, data, include_index=False, resize=True)
+
+        # Clear read caches to force fresh load on subsequent reads
+        clear_all_caches()
