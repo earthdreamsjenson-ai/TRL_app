@@ -680,7 +680,11 @@ with tab3:
                 
                 if status == "未消化":
                     if st.button("結果を保存", key=f"save_unplayed_{m_id}"):
-                        if current_status in ["通常消化", "不戦敗"]:
+                        if current_status == "雨天中止":
+                            updated_pool_df = pool_df[~((pool_df['team1'] == row['team1']) & (pool_df['team2'] == row['team2']))]
+                            conn.update(worksheet="match_pool", data=updated_pool_df)
+                        
+                        if current_status in ["通常消化", "不戦敗", "雨天中止"]:
                             updated_res_df = res_df[res_df['id'] != m_id]
                         else:
                             new_res = pd.DataFrame([{"id": m_id, "status": "未消化", "score": "-"}])
@@ -695,6 +699,10 @@ with tab3:
                     sc1 = st.number_input(f"{row['team1']} スコア", min_value=0, value=0, key=f"sc1_{m_id}")
                     sc2 = st.number_input(f"{row['team2']} スコア", min_value=0, value=0, key=f"sc2_{m_id}")
                     if st.button("結果を保存", key=f"save_{m_id}"):
+                        if current_status == "雨天中止":
+                            updated_pool_df = pool_df[~((pool_df['team1'] == row['team1']) & (pool_df['team2'] == row['team2']))]
+                            conn.update(worksheet="match_pool", data=updated_pool_df)
+                            
                         new_res = pd.DataFrame([{"id": m_id, "status": "通常消化", "score": f"{sc1}-{sc2}"}])
                         updated_res_df = pd.concat([res_df[res_df['id'] != m_id], new_res], ignore_index=True)
                         conn.update(worksheet="results", data=updated_res_df)
@@ -704,19 +712,11 @@ with tab3:
                         
                 elif status == "雨天中止":
                     if st.button("🚨 雨天中止を確定して再試合プールへ戻す", key=f"rain_{m_id}"):
-#                        updated_sched_df = sched_df[sched_df['id'] != m_id]
-#                        conn.update(worksheet="schedule", data=updated_sched_df)
+                        if current_status != "雨天中止":
+                            canceled_match = pd.DataFrame([{"team1": row['team1'], "team2": row['team2']}])
+                            updated_pool_df = pd.concat([canceled_match, pool_df], ignore_index=True)
+                            conn.update(worksheet="match_pool", data=updated_pool_df)
                         
-                        canceled_match = pd.DataFrame([{"team1": row['team1'], "team2": row['team2']}])
-                        updated_pool_df = pd.concat([canceled_match, pool_df], ignore_index=True)
-                        conn.update(worksheet="match_pool", data=updated_pool_df)
-                        
-                        slots_df.loc[slots_df['id'] == m_id, 'status'] = '未割り当て'
-                        conn.update(worksheet="available_slots", data=slots_df)
-                        
-#                        if current_status in ["通常消化", "不戦敗"]:
-#                            updated_res_df = res_df[res_df['id'] != m_id]
-#                        else:
                         new_res = pd.DataFrame([{"id": m_id, "status": "雨天中止", "score": ""}])
                         updated_res_df = pd.concat([res_df[res_df['id'] != m_id], new_res], ignore_index=True)
                         
@@ -733,6 +733,10 @@ with tab3:
                     )
                     
                     if st.button("結果を保存", key=f"save_forfeit_{m_id}"):
+                        if current_status == "雨天中止":
+                            updated_pool_df = pool_df[~((pool_df['team1'] == row['team1']) & (pool_df['team2'] == row['team2']))]
+                            conn.update(worksheet="match_pool", data=updated_pool_df)
+                            
                         if lose_team == row['team1']:
                             final_score = "0-10"
                         else:
