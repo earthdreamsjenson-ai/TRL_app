@@ -774,6 +774,21 @@ with tab4:
     # 試合結果データのパース
     processed_matches = get_processed_matches(sched_df, res_df)
     
+    # 【共通処理】全チームの総合順位を一度だけ計算
+    all_teams_list = teams_df['team'].tolist()
+    standings_all = calculate_standings(all_teams_list, processed_matches)
+    standings_all_df = pd.DataFrame(standings_all)
+    standings_all_df['リーグ'] = standings_all_df['team'].map(team_leagues)
+    
+    # 表示用カラム名へのリネーム
+    display_cols = {
+        'rank': '順位', 'team': 'チーム名', 'played': '試合数',
+        'wins': '勝', 'losses': '敗', 'draws': '分',
+        'win_pct': '勝率', 'goals_for': '得点', 
+        'goals_against': '失点', 'goal_diff': '得失点差', 'リーグ': 'リーグ'
+    }
+    standings_display_df = standings_all_df.rename(columns=display_cols)
+    
     # サブタブ作成
     sub_tab1, sub_tab2, sub_tab3 = st.tabs([
         "🏆 リーグ別順位",
@@ -781,106 +796,29 @@ with tab4:
         "📊 総当たり表 (マトリックス)"
     ])
     
-    # チームマスタからリーグ情報を取得
-    team_leagues = dict(zip(teams_df['team'], teams_df['league']))
-    
     with sub_tab1:
         st.subheader("🏆 リーグ別順位表")
-        st.caption("※ リーグ内対戦（同じリーグ同士のチームの試合）のみが集計対象となります。")
-        
-        # リーグ一覧を取得
         leagues = sorted(list(teams_df['league'].dropna().unique()))
         selected_league = st.selectbox("表示するリーグを選択してください", leagues, key="select_league")
         
-        # 選択されたリーグのチーム
-        league_teams = teams_df[teams_df['league'] == selected_league]['team'].tolist()
+        # 選択されたリーグで絞り込み
+        league_df = standings_display_df[standings_display_df['リーグ'] == selected_league].copy()
         
-        # リーグ内の試合のみ抽出
-        league_matches = [
-            m for m in processed_matches
-            if m['team1'] in league_teams or m['team2'] in league_teams
-        ]
+        # 順位をフィルタリング後のデータに合わせて再採番
+        league_df = league_df.sort_values(by=['勝率', '勝', '得失点差'], ascending=False)
+        league_df['順位'] = range(1, len(league_df) + 1)
         
-        # 順位計算
-        standings_l = calculate_standings(league_teams, league_matches)
-        standings_l_df = pd.DataFrame(standings_l)
-        
-        if not standings_l_df.empty:
-            standings_l_df = standings_l_df.rename(columns={
-                'rank': '順位',
-                'team': 'チーム名',
-                'played': '試合数',
-                'wins': '勝',
-                'losses': '敗',
-                'draws': '分',
-                'win_pct': '勝率',
-                'goals_for': '得点',
-                'goals_against': '失点',
-                'goal_diff': '得失点差'
-            })
-            
-            st.dataframe(
-                standings_l_df[['順位', 'チーム名', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
-                width="stretch",
-                hide_index=True,
-                column_config={
-                    "順位": st.column_config.NumberColumn("順位", width=60),
-                    "試合数": st.column_config.NumberColumn("試合数", width=70),
-                    "勝": st.column_config.NumberColumn("勝", width=60),
-                    "敗": st.column_config.NumberColumn("敗", width=60),
-                    "分": st.column_config.NumberColumn("分", width=60),
-                    "勝率": st.column_config.NumberColumn("勝率", format="%.3f", width=80),
-                    "得点": st.column_config.NumberColumn("得点", width=70),
-                    "失点": st.column_config.NumberColumn("失点", width=70),
-                    "得失点差": st.column_config.NumberColumn("得失点差", width=90)
-                }
-            )
-        else:
-            st.info("データがありません。")
+        st.dataframe(
+            league_df[['順位', 'チーム名', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
+            width="stretch", hide_index=True
+        )
 
     with sub_tab2:
         st.subheader("🌎 総合順位表")
-        st.caption("※ インターリーグ（リーグ外対戦）も含めた全試合の対戦成績に基づきます。")
-        
-        # 全試合
-        all_teams_list = teams_df['team'].tolist()
-        standings_g = calculate_standings(all_teams_list, processed_matches)
-        standings_g_df = pd.DataFrame(standings_g)
-        
-        if not standings_g_df.empty:
-            standings_g_df['リーグ'] = standings_g_df['team'].map(team_leagues)
-            standings_g_df = standings_g_df.rename(columns={
-                'rank': '順位',
-                'team': 'チーム名',
-                'played': '試合数',
-                'wins': '勝',
-                'losses': '敗',
-                'draws': '分',
-                'win_pct': '勝率',
-                'goals_for': '得点',
-                'goals_against': '失点',
-                'goal_diff': '得失点差'
-            })
-            
-            st.dataframe(
-                standings_g_df[['順位', 'チーム名', 'リーグ', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
-                width="stretch",
-                hide_index=True,
-                column_config={
-                    "順位": st.column_config.NumberColumn("順位", width=60),
-                    "リーグ": st.column_config.TextColumn("リーグ", width=80),
-                    "試合数": st.column_config.NumberColumn("試合数", width=70),
-                    "勝": st.column_config.NumberColumn("勝", width=60),
-                    "敗": st.column_config.NumberColumn("敗", width=60),
-                    "分": st.column_config.NumberColumn("分", width=60),
-                    "勝率": st.column_config.NumberColumn("勝率", format="%.3f", width=80),
-                    "得点": st.column_config.NumberColumn("得点", width=70),
-                    "失点": st.column_config.NumberColumn("失点", width=70),
-                    "得失点差": st.column_config.NumberColumn("得失点差", width=90)
-                }
-            )
-        else:
-            st.info("データがありません。")
+        st.dataframe(
+            standings_display_df[['順位', 'チーム名', 'リーグ', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
+            width="stretch", hide_index=True
+        )
 
     with sub_tab3:
         st.subheader("📊 全試合対戦総当たり表 (マトリックス)")
