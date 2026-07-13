@@ -798,7 +798,7 @@ with tab4:
         # リーグ内の試合のみ抽出
         league_matches = [
             m for m in processed_matches
-            if m['team1'] in league_teams and m['team2'] in league_teams
+            if m['team1'] in league_teams or m['team2'] in league_teams
         ]
         
         # 順位計算
