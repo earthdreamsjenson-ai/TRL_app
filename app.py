@@ -31,9 +31,9 @@ def load_all_data():
 
 # 2. 初期読み込み（自動）ではなく、関数を呼ぶ前にチェックする
 # アプリのメイン部分を関数化するか、以下のように制御します
-if 'data_loaded' not in st.session_state:
-    if st.button("アプリを起動（データを読み込む）"):
-        with st.spinner("データを読み込んでいます..."):
+#if 'data_loaded' not in st.session_state:
+#    if st.button("アプリを起動（データを読み込む）"):
+#        with st.spinner("データを読み込んでいます..."):
             # データを取得
             pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df = load_all_data()
             
@@ -49,8 +49,8 @@ if 'data_loaded' not in st.session_state:
             st.session_state['data_loaded'] = True
             st.session_state['dfs'] = (pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df)
             st.rerun()
-    else:
-        st.stop() # ボタンが押されるまでここで待機（メモリを消費しない）
+#    else:
+#        st.stop() # ボタンが押されるまでここで待機（メモリを消費しない）
 
 # 3. 読み込み済みデータを取り出す
 pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df = st.session_state['dfs']
