@@ -35,20 +35,20 @@ def load_all_data():
 #    if st.button("アプリを起動（データを読み込む）"):
 #        with st.spinner("データを読み込んでいます..."):
             # データを取得
-            pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df = load_all_data()
+pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df = load_all_data()
             
             # データの加工処理
-            if 'allow_far' in teams_df.columns:
-                teams_df['allow_far'] = teams_df['allow_far'].fillna(False).astype(bool)
-            if 'is_far' in grounds_df.columns:
-                grounds_df['is_far'] = grounds_df['is_far'].fillna(False).astype(bool)
-            if 'maps_url' in grounds_df.columns:
-                grounds_df['maps_url'] = grounds_df['maps_url'].fillna("").astype(str)
+if 'allow_far' in teams_df.columns:
+    teams_df['allow_far'] = teams_df['allow_far'].fillna(False).astype(bool)
+if 'is_far' in grounds_df.columns:
+    grounds_df['is_far'] = grounds_df['is_far'].fillna(False).astype(bool)
+if 'maps_url' in grounds_df.columns:
+    grounds_df['maps_url'] = grounds_df['maps_url'].fillna("").astype(str)
             
             # セッションに保存して保持する
-            st.session_state['data_loaded'] = True
-            st.session_state['dfs'] = (pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df)
-            st.rerun()
+st.session_state['data_loaded'] = True
+st.session_state['dfs'] = (pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df)
+st.rerun()
 #    else:
 #        st.stop() # ボタンが押されるまでここで待機（メモリを消費しない）
 
