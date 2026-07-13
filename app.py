@@ -817,7 +817,7 @@ with tab4:
         st.markdown("""
         <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 0.85em; color: #5f6368;">
         <strong>【順位決定ルール】</strong><br>
-        1. 勝率 ＞ 2. 勝ち数 ＞ 3. 得失点差 ＞ 4. 直接対決の順で判定します。
+        1. 勝率 ＞ 2. 勝ち数 ＞ 3. 得失点差 ＞ 4. 直接対決
         </div>
         """, unsafe_allow_html=True)
 
@@ -831,7 +831,7 @@ with tab4:
         st.markdown("""
         <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 0.85em; color: #5f6368;">
         <strong>【順位決定ルール】</strong><br>
-        1. 勝率 ＞ 2. 勝ち数 ＞ 3. 得失点差 ＞ 4. 直接対決の順で判定します。
+        1. 勝率 ＞ 2. 勝ち数 ＞ 3. 得失点差 ＞ 4. 直接対決
         </div>
         """, unsafe_allow_html=True)
 
