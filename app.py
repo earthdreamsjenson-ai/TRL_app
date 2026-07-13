@@ -46,9 +46,9 @@ if 'maps_url' in grounds_df.columns:
     grounds_df['maps_url'] = grounds_df['maps_url'].fillna("").astype(str)
             
             # セッションに保存して保持する
-st.session_state['data_loaded'] = True
-st.session_state['dfs'] = (pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df)
-st.rerun()
+            #st.session_state['data_loaded'] = True
+            #st.session_state['dfs'] = (pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df)
+            #st.rerun()
 #    else:
 #        st.stop() # ボタンが押されるまでここで待機（メモリを消費しない）
 
