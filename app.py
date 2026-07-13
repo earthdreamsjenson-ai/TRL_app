@@ -244,6 +244,9 @@ def resolve_head_to_head(group_teams, matches):
 # 2. 日程自動作成ロジック
 # ==========================================
 def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
+    # 遠方グラウンドを優先して割り当てるため、is_far が True のスロットを先頭にするようにソート
+    slots = sorted(slots, key=lambda s: s.get('is_far', False), reverse=True)
+
     allocated_matches = []
     team_monthly_counts = {team: 0 for team in all_teams}
 
