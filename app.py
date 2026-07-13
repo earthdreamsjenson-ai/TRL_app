@@ -12,50 +12,29 @@ st.title("⚾ TRL日程管理")
 # ==========================================
 # 1. Googleスプレッドシートからの全7シート読込
 # ==========================================
-
-# 接続先の設定
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 1. 読み込み関数にキャッシュ（st.cache_data）を追加
-@st.cache_data(ttl=600)
 def load_all_data():
-    # 読み込み処理をここに集約
-    pool_df = conn.read(worksheet="match_pool")
-    sched_df = conn.read(worksheet="schedule")
-    res_df = conn.read(worksheet="results")
-    teams_df = conn.read(worksheet="teams")
-    grounds_df = conn.read(worksheet="grounds")
-    ng_df = conn.read(worksheet="unavailable_days")
-    slots_df = conn.read(worksheet="available_slots")
+    pool_df = conn.read(worksheet="match_pool", ttl=600)
+    sched_df = conn.read(worksheet="schedule", ttl=600)
+    res_df = conn.read(worksheet="results", ttl=600)
+    teams_df = conn.read(worksheet="teams", ttl=600)
+    grounds_df = conn.read(worksheet="grounds", ttl=600)
+    ng_df = conn.read(worksheet="unavailable_days", ttl=600)
+    slots_df = conn.read(worksheet="available_slots", ttl=600)
     return pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df
 
-# 2. 初期読み込み（自動）ではなく、関数を呼ぶ前にチェックする
-# アプリのメイン部分を関数化するか、以下のように制御します
-#if 'data_loaded' not in st.session_state:
-#    if st.button("アプリを起動（データを読み込む）"):
-#        with st.spinner("データを読み込んでいます..."):
-            # データを取得
 pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df = load_all_data()
-            
-            # データの加工処理
+
+# 【重要】読み込み直後に型の不一致を解消
 if 'allow_far' in teams_df.columns:
     teams_df['allow_far'] = teams_df['allow_far'].fillna(False).astype(bool)
 if 'is_far' in grounds_df.columns:
     grounds_df['is_far'] = grounds_df['is_far'].fillna(False).astype(bool)
 if 'maps_url' in grounds_df.columns:
     grounds_df['maps_url'] = grounds_df['maps_url'].fillna("").astype(str)
-            
-            # セッションに保存して保持する
-            #st.session_state['data_loaded'] = True
-            #st.session_state['dfs'] = (pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df)
-            #st.rerun()
-#    else:
-#        st.stop() # ボタンが押されるまでここで待機（メモリを消費しない）
 
-# 3. 読み込み済みデータを取り出す
-pool_df, sched_df, res_df, teams_df, grounds_df, ng_df, slots_df = st.session_state['dfs']
-
-# (この後のコードはそのまま使えます)
+# マスタデータの辞書化・リスト化
 all_teams = teams_df['team'].tolist()
 team_allow_far = dict(zip(teams_df['team'], teams_df['allow_far']))
 ground_options = grounds_df['name'].tolist()
