@@ -813,6 +813,13 @@ with tab4:
             league_df[['順位', 'チーム名', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
             width="stretch", hide_index=True
         )
+        # 【追加】順位決定ルールのメモ
+        st.markdown("""
+        <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 0.85em; color: #5f6368;">
+        <strong>【順位決定ルール】</strong><br>
+        1. 勝率 ＞ 2. 勝ち数 ＞ 3. 得失点差 ＞ 4. 直接対決の順で判定します。
+        </div>
+        """, unsafe_allow_html=True)
 
     with sub_tab2:
         st.subheader("🌎 総合順位表")
@@ -820,6 +827,13 @@ with tab4:
             standings_display_df[['順位', 'チーム名', 'リーグ', '試合数', '勝', '敗', '分', '勝率', '得点', '失点', '得失点差']],
             width="stretch", hide_index=True
         )
+        # 【追加】順位決定ルールのメモ
+        st.markdown("""
+        <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 0.85em; color: #5f6368;">
+        <strong>【順位決定ルール】</strong><br>
+        1. 勝率 ＞ 2. 勝ち数 ＞ 3. 得失点差 ＞ 4. 直接対決の順で判定します。
+        </div>
+        """, unsafe_allow_html=True)
 
     with sub_tab3:
         st.subheader("📊 全試合対戦総当たり表 (マトリックス)")
