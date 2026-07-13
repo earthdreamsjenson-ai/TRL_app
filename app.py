@@ -313,7 +313,14 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
 
     pool_team_counts = Counter([team for match in match_list for team in match])
     random.shuffle(match_list)
-    match_list.sort(key=lambda m: pool_team_counts[m[0]] + pool_team_counts[m[1]], reverse=True)
+    # 残り試合数が多いチームを優先するため、ペアの最大残り試合数を第一キー、合計を第二キーにして降順ソート
+    match_list.sort(
+        key=lambda m: (
+            max(pool_team_counts[m[0]], pool_team_counts[m[1]]),
+            pool_team_counts[m[0]] + pool_team_counts[m[1]]
+        ),
+        reverse=True
+    )
 
     if backtrack(0):
         new_games = []
