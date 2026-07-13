@@ -9,6 +9,14 @@ from collections import Counter
 st.set_page_config(page_title="TRL日程管理", layout="wide")
 st.title("⚾ TRL日程管理")
 
+# サイドバーに配置する場合のコード例
+with st.sidebar:
+    st.subheader("アプリ設定")
+    if st.button("🔄 データを最新に更新"):
+        st.cache_data.clear()
+        st.rerun()
+    st.info("※スプレッドシートの内容を反映させるにはこのボタンを押してください。")
+
 # ==========================================
 # 1. Googleスプレッドシートからの全7シート読込
 # ==========================================
