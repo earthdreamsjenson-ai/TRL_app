@@ -45,6 +45,7 @@ if 'maps_url' in grounds_df.columns:
 # マスタデータの辞書化・リスト化
 all_teams = teams_df['team'].tolist()
 team_allow_far = dict(zip(teams_df['team'], teams_df['allow_far']))
+team_leagues = dict(zip(teams_df['team'], teams_df['league'])) 
 ground_options = grounds_df['name'].tolist()
 ground_is_far = dict(zip(grounds_df['name'], grounds_df['is_far']))
 ground_maps = dict(zip(grounds_df['name'], grounds_df['maps_url']))
