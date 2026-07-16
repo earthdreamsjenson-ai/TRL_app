@@ -659,6 +659,22 @@ with tab2:
                 line_msg += f"{row['team1']}-{row['team2']}\n"
                 line_msg += f"{date_formatted} {row['slot']} {row['ground_name']}\n\n"
             
+            # 未割り当てグラウンドを取得して追加
+            vacant_slots = pd.DataFrame()
+            if not slots_df.empty:
+                vacant_slots = slots_df[(slots_df['year_month'] == target_month_sched) & (slots_df['status'] == "未割り当て")].copy()
+            
+            if not vacant_slots.empty:
+                vacant_slots = vacant_slots.sort_values(by=["date", "slot"])
+                line_msg += "空きグラウンド\n"
+                for _, row in vacant_slots.iterrows():
+                    try:
+                        v_date_formatted = datetime.strptime(row['date'], "%Y-%m-%d").strftime("%m/%d")
+                    except Exception:
+                        v_date_formatted = row['date'][5:10].replace('-', '/')
+                    line_msg += f"{v_date_formatted} {row['slot']} {row['ground_name']}\n"
+                line_msg += "\n"
+            
             line_msg = line_msg.strip()
             st.text_area(
                 "📋 以下のテキストエリアをクリックし、全選択（Ctrl+A / ⌘+A）してコピーしてください", 
