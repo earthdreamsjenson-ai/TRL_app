@@ -684,7 +684,7 @@ with tab2:
             # 表示用文字列を作成
             slots_available['display'] = slots_available['date'] + " " + slots_available['slot'] + " @" + slots_available['ground_name']
             
-            selected_slot_disp = st.selectbox("② 割り当てるグラウンド枠を選択してください", slots_available['display'].tolist(), index=None, key="manual_slot_select")
+            selected_slot_disp = st.selectbox("② 割り当てるグラウンド枠を選択してください", slots_available['display'].tolist(), key="manual_slot_select")
             selected_slot_row = slots_available[slots_available['display'] == selected_slot_disp].iloc[0]
             
             slot_id = selected_slot_row['id']
