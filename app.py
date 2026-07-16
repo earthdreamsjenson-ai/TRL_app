@@ -650,7 +650,6 @@ with tab2:
         
         if selected_match_str is None:
             pass
-            # st.write("未選択")
         else:
             # 選択された試合のインデックスを取得してチームを特定
             selected_idx = pool_options.index(selected_match_str)
@@ -840,7 +839,7 @@ with tab2:
             st.text_area(
                 "📋 以下のテキストエリアをクリックし、全選択（Ctrl+A / ⌘+A）してコピーしてください", 
                 value=line_msg, 
-                height=350
+                height=600#350
             )
 
 # ==========================================
