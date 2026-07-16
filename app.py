@@ -649,6 +649,7 @@ with tab2:
         selected_match_str = st.selectbox("① 割り付ける試合を選択してください", pool_options, index=None, key="manual_match_select")
         
         if selected_match_str is None:
+            pass
             # st.write("未選択")
         else:
             # 選択された試合のインデックスを取得してチームを特定
