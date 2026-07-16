@@ -648,105 +648,108 @@ with tab2:
         pool_options = [f"{row['team1']} vs {row['team2']}" for _, row in pool_df.iterrows()]
         selected_match_str = st.selectbox("① 割り付ける試合を選択してください", pool_options, index=None, key="manual_match_select")
         
-        # 選択された試合のインデックスを取得してチームを特定
-        selected_idx = pool_options.index(selected_match_str)
-        selected_row = pool_df.iloc[selected_idx]
-        t1 = selected_row['team1']
-        t2 = selected_row['team2']
-        
-        st.write(f"対象月: **{target_month_sched}**")
-        
-        # 1. 対象月の未割り当てスロットを抽出
-        slots_available = slots_df[(slots_df['year_month'] == target_month_sched) & (slots_df['status'] == '未割り当て')].copy()
-        
-        # 2. t1 と t2 のNG日を取得
-        monthly_ng_df = ng_df[ng_df['year_month'] == target_month_sched]
-        t1_ng_dates = monthly_ng_df[monthly_ng_df['team'] == t1]['ng_date'].tolist()
-        t2_ng_dates = monthly_ng_df[monthly_ng_df['team'] == t2]['ng_date'].tolist()
-        team_ng_dates = set(t1_ng_dates + t2_ng_dates)
-        
-        # NG日のスロットを除外
-        if team_ng_dates:
-            slots_available = slots_available[~slots_available['date'].isin(team_ng_dates)]
-            
-        # 3. 遠方制限のチェック
-        t1_allow_far = team_allow_far.get(t1, False)
-        t2_allow_far = team_allow_far.get(t2, False)
-        
-        # どちらかが遠方NGの場合、遠方グラウンド（is_far == True）を除外
-        if not t1_allow_far or not t2_allow_far:
-            slots_available['is_far'] = slots_available['ground_name'].map(ground_is_far)
-            slots_available = slots_available[slots_available['is_far'] == False]
-            
-        if slots_available.empty:
-            st.warning("⚠️ 選択した試合のチームのNG日を回避し、遠方移動制限を満たす「未割り当て」のグラウンド枠がありません。")
+        if pool_options is None:
+            st.write("未選択")    
         else:
-            # 表示用文字列を作成
-            slots_available['display'] = slots_available['date'] + " " + slots_available['slot'] + " @" + slots_available['ground_name']
+            # 選択された試合のインデックスを取得してチームを特定
+            selected_idx = pool_options.index(selected_match_str)
+            selected_row = pool_df.iloc[selected_idx]
+            t1 = selected_row['team1']
+            t2 = selected_row['team2']
             
-            selected_slot_disp = st.selectbox("② 割り当てるグラウンド枠を選択してください", slots_available['display'].tolist(), key="manual_slot_select")
-            selected_slot_row = slots_available[slots_available['display'] == selected_slot_disp].iloc[0]
+            st.write(f"対象月: **{target_month_sched}**")
             
-            slot_id = selected_slot_row['id']
-            slot_date = selected_slot_row['date']
-            slot_time = selected_slot_row['slot']
-            slot_ground = selected_slot_row['ground_name']
+            # 1. 対象月の未割り当てスロットを抽出
+            slots_available = slots_df[(slots_df['year_month'] == target_month_sched) & (slots_df['status'] == '未割り当て')].copy()
             
-            # 制約バリデーション（警告表示）
-            # 月間2試合制限のチェック（既存スケジュールからカウント）
-            target_month_scheduled = sched_df[sched_df['date'].astype(str).str.startswith(target_month_sched)] if not sched_df.empty else pd.DataFrame()
-            t1_existing_count = 0
-            t2_existing_count = 0
-            t1_has_match_today = False
-            t2_has_match_today = False
+            # 2. t1 と t2 のNG日を取得
+            monthly_ng_df = ng_df[ng_df['year_month'] == target_month_sched]
+            t1_ng_dates = monthly_ng_df[monthly_ng_df['team'] == t1]['ng_date'].tolist()
+            t2_ng_dates = monthly_ng_df[monthly_ng_df['team'] == t2]['ng_date'].tolist()
+            team_ng_dates = set(t1_ng_dates + t2_ng_dates)
             
-            if not target_month_scheduled.empty:
-                t1_existing_count = ((target_month_scheduled['team1'] == t1) | (target_month_scheduled['team2'] == t1)).sum()
-                t2_existing_count = ((target_month_scheduled['team1'] == t2) | (target_month_scheduled['team2'] == t2)).sum()
+            # NG日のスロットを除外
+            if team_ng_dates:
+                slots_available = slots_available[~slots_available['date'].isin(team_ng_dates)]
                 
-                t1_has_match_today = ((target_month_scheduled['date'] == slot_date) & ((target_month_scheduled['team1'] == t1) | (target_month_scheduled['team2'] == t1))).any()
-                t2_has_match_today = ((target_month_scheduled['date'] == slot_date) & ((target_month_scheduled['team1'] == t2) | (target_month_scheduled['team2'] == t2))).any()
+            # 3. 遠方制限のチェック
+            t1_allow_far = team_allow_far.get(t1, False)
+            t2_allow_far = team_allow_far.get(t2, False)
             
-            warnings = []
-            if t1_existing_count >= 2:
-                warnings.append(f"⚠️ {t1} はすでに {target_month_sched} に {t1_existing_count} 試合割り当てられています（月間最大2試合制限を超過します）。")
-            if t2_existing_count >= 2:
-                warnings.append(f"⚠️ {t2} はすでに {target_month_sched} に {t2_existing_count} 試合割り当てられています（月間最大2試合制限を超過します）。")
+            # どちらかが遠方NGの場合、遠方グラウンド（is_far == True）を除外
+            if not t1_allow_far or not t2_allow_far:
+                slots_available['is_far'] = slots_available['ground_name'].map(ground_is_far)
+                slots_available = slots_available[slots_available['is_far'] == False]
                 
-            if t1_has_match_today:
-                warnings.append(f"⚠️ {t1} は {slot_date} にすでに別の試合があります（ダブルヘッダー禁止に違反します）。")
-            if t2_has_match_today:
-                warnings.append(f"⚠️ {t2} は {slot_date} にすでに別の試合があります（ダブルヘッダー禁止に違反します）。")
+            if slots_available.empty:
+                st.warning("⚠️ 選択した試合のチームのNG日を回避し、遠方移動制限を満たす「未割り当て」のグラウンド枠がありません。")
+            else:
+                # 表示用文字列を作成
+                slots_available['display'] = slots_available['date'] + " " + slots_available['slot'] + " @" + slots_available['ground_name']
                 
-            for w in warnings:
-                st.warning(w)
+                selected_slot_disp = st.selectbox("② 割り当てるグラウンド枠を選択してください", slots_available['display'].tolist(), key="manual_slot_select")
+                selected_slot_row = slots_available[slots_available['display'] == selected_slot_disp].iloc[0]
                 
-            if st.button("💾 手動で試合を割り付ける", type="primary", key="btn_manual_assign"):
-                with st.spinner("手動割り付け処理中..."):
-                    # 1. schedule に追加
-                    new_sched_row = pd.DataFrame([{
-                        "id": slot_id,
-                        "date": slot_date,
-                        "slot": slot_time,
-                        "ground_name": slot_ground,
-                        "team1": t1,
-                        "team2": t2
-                    }])
-                    updated_sched_df = pd.concat([sched_df, new_sched_row], ignore_index=True)
-                    conn.update(worksheet="schedule", data=updated_sched_df)
+                slot_id = selected_slot_row['id']
+                slot_date = selected_slot_row['date']
+                slot_time = selected_slot_row['slot']
+                slot_ground = selected_slot_row['ground_name']
+                
+                # 制約バリデーション（警告表示）
+                # 月間2試合制限のチェック（既存スケジュールからカウント）
+                target_month_scheduled = sched_df[sched_df['date'].astype(str).str.startswith(target_month_sched)] if not sched_df.empty else pd.DataFrame()
+                t1_existing_count = 0
+                t2_existing_count = 0
+                t1_has_match_today = False
+                t2_has_match_today = False
+                
+                if not target_month_scheduled.empty:
+                    t1_existing_count = ((target_month_scheduled['team1'] == t1) | (target_month_scheduled['team2'] == t1)).sum()
+                    t2_existing_count = ((target_month_scheduled['team1'] == t2) | (target_month_scheduled['team2'] == t2)).sum()
                     
-                    # 2. match_pool から削除
-                    updated_pool_df = pool_df.drop(selected_idx).reset_index(drop=True)
-                    conn.update(worksheet="match_pool", data=updated_pool_df)
+                    t1_has_match_today = ((target_month_scheduled['date'] == slot_date) & ((target_month_scheduled['team1'] == t1) | (target_month_scheduled['team2'] == t1))).any()
+                    t2_has_match_today = ((target_month_scheduled['date'] == slot_date) & ((target_month_scheduled['team1'] == t2) | (target_month_scheduled['team2'] == t2))).any()
+                
+                warnings = []
+                if t1_existing_count >= 2:
+                    warnings.append(f"⚠️ {t1} はすでに {target_month_sched} に {t1_existing_count} 試合割り当てられています（月間最大2試合制限を超過します）。")
+                if t2_existing_count >= 2:
+                    warnings.append(f"⚠️ {t2} はすでに {target_month_sched} に {t2_existing_count} 試合割り当てられています（月間最大2試合制限を超過します）。")
                     
-                    # 3. available_slots の status を割り当て済みに更新
-                    slots_df.loc[slots_df['id'] == slot_id, 'status'] = '割り当て済み'
-                    conn.update(worksheet="available_slots", data=slots_df)
+                if t1_has_match_today:
+                    warnings.append(f"⚠️ {t1} は {slot_date} にすでに別の試合があります（ダブルヘッダー禁止に違反します）。")
+                if t2_has_match_today:
+                    warnings.append(f"⚠️ {t2} は {slot_date} にすでに別の試合があります（ダブルヘッダー禁止に違反します）。")
                     
-                    # キャッシュクリアと再描画
-                    st.cache_data.clear()
-                    st.success(f"🎉 試合 【{t1} vs {t2}】 を {slot_date} {slot_time} @{slot_ground} に手動割り付けしました！")
-                    st.rerun()
+                for w in warnings:
+                    st.warning(w)
+                    
+                if st.button("💾 手動で試合を割り付ける", type="primary", key="btn_manual_assign"):
+                    with st.spinner("手動割り付け処理中..."):
+                        # 1. schedule に追加
+                        new_sched_row = pd.DataFrame([{
+                            "id": slot_id,
+                            "date": slot_date,
+                            "slot": slot_time,
+                            "ground_name": slot_ground,
+                            "team1": t1,
+                            "team2": t2
+                        }])
+                        updated_sched_df = pd.concat([sched_df, new_sched_row], ignore_index=True)
+                        conn.update(worksheet="schedule", data=updated_sched_df)
+                        
+                        # 2. match_pool から削除
+                        updated_pool_df = pool_df.drop(selected_idx).reset_index(drop=True)
+                        conn.update(worksheet="match_pool", data=updated_pool_df)
+                        
+                        # 3. available_slots の status を割り当て済みに更新
+                        slots_df.loc[slots_df['id'] == slot_id, 'status'] = '割り当て済み'
+                        conn.update(worksheet="available_slots", data=slots_df)
+                        
+                        # キャッシュクリアと再描画
+                        st.cache_data.clear()
+                        st.success(f"🎉 試合 【{t1} vs {t2}】 を {slot_date} {slot_time} @{slot_ground} に手動割り付けしました！")
+                        st.rerun()
 
     # 選択した月の作成済み日程を取得
     target_month_scheduled = sched_df[sched_df['date'].astype(str).str.startswith(target_month_sched)] if not sched_df.empty else pd.DataFrame()
