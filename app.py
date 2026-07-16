@@ -591,6 +591,42 @@ with tab2:
             else:
                 st.error("❌ 条件（各チームのNG日や遠方制限など）が厳しく、マッチングする組み合わせが見つかりませんでした。枠を増やすか調整してください。")
 
+    # 選択した月の作成済み日程を取得
+    target_month_scheduled = sched_df[sched_df['date'].astype(str).str.startswith(target_month_sched)] if not sched_df.empty else pd.DataFrame()
+    
+    if not target_month_scheduled.empty:
+        st.markdown("---")
+        st.subheader("⚠️ 作成済み日程の削除・やり直し")
+        st.warning(f"現在、**{target_month_sched}** の作成済み試合が **{len(target_month_scheduled)}件** 登録されています。作成し直す場合は、一旦削除してください。")
+        st.dataframe(target_month_scheduled[['date', 'slot', 'ground_name', 'team1', 'team2']], width="stretch", hide_index=True)
+        
+        confirm_delete = st.checkbox("上記日程を削除し、試合ペアを対戦プールに戻し、グラウンド枠を「未割り当て」に戻すことに同意します。", key="confirm_delete_month")
+        if st.button("🗑️ この月の日程を削除してやり直す", type="primary", disabled=not confirm_delete):
+            with st.spinner("削除処理を実行中..."):
+                # 1. 試合をプールに戻す
+                returned_matches = target_month_scheduled[['team1', 'team2']].copy()
+                updated_pool_df = pd.concat([pool_df, returned_matches], ignore_index=True)
+                conn.update(worksheet="match_pool", data=updated_pool_df)
+                
+                # 2. グラウンドを未割り当てにする
+                deleted_ids = target_month_scheduled['id'].tolist()
+                slots_df.loc[slots_df['id'].isin(deleted_ids), 'status'] = '未割り当て'
+                conn.update(worksheet="available_slots", data=slots_df)
+                
+                # 3. スケジュールから削除
+                updated_sched_df = sched_df[~sched_df['id'].isin(deleted_ids)]
+                conn.update(worksheet="schedule", data=updated_sched_df)
+                
+                # 4. 結果データからも削除 (不整合防止)
+                if not res_df.empty:
+                    updated_res_df = res_df[~res_df['id'].isin(deleted_ids)]
+                    conn.update(worksheet="results", data=updated_res_df)
+                
+                # キャッシュクリアと画面リロード
+                st.cache_data.clear()
+                st.success(f"🎉 {target_month_sched} の日程 {len(target_month_scheduled)}件 を削除し、プールおよび空き枠を元に戻しました！")
+                st.rerun()
+
     if not sched_df.empty:
         st.subheader("🗓️ 確定スケジュール一覧")
         display_sched = sched_df.copy()
