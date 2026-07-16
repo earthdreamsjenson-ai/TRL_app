@@ -646,7 +646,7 @@ with tab2:
     else:
         # pool_dfの各行を "チーム1 vs チーム2" 形式にする
         pool_options = [f"{row['team1']} vs {row['team2']}" for _, row in pool_df.iterrows()]
-        selected_match_str = st.selectbox("① 割り付ける試合を選択してください", pool_options, key="manual_match_select")
+        selected_match_str = st.selectbox("① 割り付ける試合を選択してください", pool_options, index=None, key="manual_match_select")
         
         # 選択された試合のインデックスを取得してチームを特定
         selected_idx = pool_options.index(selected_match_str)
@@ -684,7 +684,7 @@ with tab2:
             # 表示用文字列を作成
             slots_available['display'] = slots_available['date'] + " " + slots_available['slot'] + " @" + slots_available['ground_name']
             
-            selected_slot_disp = st.selectbox("② 割り当てるグラウンド枠を選択してください", slots_available['display'].tolist(), key="manual_slot_select")
+            selected_slot_disp = st.selectbox("② 割り当てるグラウンド枠を選択してください", slots_available['display'].tolist(), index=None, key="manual_slot_select")
             selected_slot_row = slots_available[slots_available['display'] == selected_slot_disp].iloc[0]
             
             slot_id = selected_slot_row['id']
