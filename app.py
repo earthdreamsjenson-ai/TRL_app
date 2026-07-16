@@ -253,8 +253,8 @@ def resolve_head_to_head(group_teams, matches):
 # 2. 日程自動作成ロジック
 # ==========================================
 def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
-    # 遠方グラウンドを優先して割り当てるため、is_far が True のスロットを先頭にするようにソート
-    slots = sorted(slots, key=lambda s: s.get('is_far', False), reverse=True)
+    # 通常グラウンド（is_far=False）を先に割り当てるため、is_far が False のスロットを先頭にするようにソート
+    slots = sorted(slots, key=lambda s: s.get('is_far', False))
 
     allocated_matches = []
     team_monthly_counts = {team: 0 for team in all_teams}
@@ -276,7 +276,31 @@ def make_monthly_schedule(match_list, slots, ng_days_dict, team_far_dict):
         is_far_ground = current_slot['is_far']
         teams_playing_today = get_teams_playing_on(date)
         
-        for i, match in enumerate(match_list):
+        # 試行する対戦候補のインデックスリストを構築
+        indices = []
+        if not is_far_ground:
+            # ①通常グラウンド: 遠方NGを含む試合を優先して試行
+            for i, match in enumerate(match_list):
+                t1, t2 = match
+                is_far_match = team_far_dict.get(t1, False) and team_far_dict.get(t2, False)
+                if not is_far_match:
+                    indices.append(i)
+            # ②通常グラウンド: 通常グラウンドが残っていたら、遠方OKのチーム同士の試合を試行
+            for i, match in enumerate(match_list):
+                t1, t2 = match
+                is_far_match = team_far_dict.get(t1, False) and team_far_dict.get(t2, False)
+                if is_far_match:
+                    indices.append(i)
+        else:
+            # ③遠方グラウンド: 遠方OKのチーム同士の試合のみ試行
+            for i, match in enumerate(match_list):
+                t1, t2 = match
+                is_far_match = team_far_dict.get(t1, False) and team_far_dict.get(t2, False)
+                if is_far_match:
+                    indices.append(i)
+        
+        for i in indices:
+            match = match_list[i]
             t1, t2 = match
             
             # 各種制約チェック
