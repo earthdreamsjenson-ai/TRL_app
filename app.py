@@ -648,8 +648,8 @@ with tab2:
         pool_options = [f"{row['team1']} vs {row['team2']}" for _, row in pool_df.iterrows()]
         selected_match_str = st.selectbox("① 割り付ける試合を選択してください", pool_options, index=None, key="manual_match_select")
         
-        if pool_options is None:
-            st.write("未選択")    
+        if pool_options.index is None:
+            st.write("未選択")
         else:
             # 選択された試合のインデックスを取得してチームを特定
             selected_idx = pool_options.index(selected_match_str)
