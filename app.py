@@ -443,12 +443,12 @@ with tab1:
 
 # --- タブ2: グラウンド枠登録 ＆ 日程自動作成 ---
 with tab2:
-    st.header("🛠️ グラウンド枠登録・日程作成")
+    st.header("🛠️ グラウンド登録・日程作成")
     
-    st.subheader("① 確保したグラウンド枠の登録（随時保存可能）")
+    st.subheader("① グラウンド枠の登録")
     reg_mode = st.radio(
         "登録モードを選択してください", 
-        ["1件ずつ登録", "画面でまとめて登録 (Excel風)", "テキストを直接貼り付けて登録", "CSVファイルから一括アップロード"], 
+        ["1件ずつ登録", "まとめて登録", "テキストを直接貼り付けて登録", "CSVファイルから一括アップロード"], 
         horizontal=True
     )
     
@@ -478,7 +478,7 @@ with tab2:
                 st.success(f"枠 {generated_id} を「未割り当て」として保存しました！")
                 st.rerun()
 
-    elif reg_mode == "画面でまとめて登録 (Excel風)":
+    elif reg_mode == "まとめて登録":
         st.markdown("💡 **Excel等から複数行をコピー（Ctrl+C）し、下の表に貼り付け（Ctrl+V）が可能です。**")
         input_template = pd.DataFrame(columns=["date", "slot", "ground_name"])
         edited_df = st.data_editor(
@@ -593,8 +593,8 @@ with tab2:
     st.markdown("---")
     
     # 2-2. 保存された枠を使った日程の自動作成
-    st.subheader("② 次月の日程自動作成の実行")
-    target_month_sched = st.selectbox("作成する対象月を選択", ["2026-07", "2026-08", "2026-09"], index=1, key="sb_month")
+    st.subheader("② 日程自動作成")
+    target_month_sched = target_month # st.selectbox("作成する対象月を選択", ["2026-07", "2026-08", "2026-09"], index=1, key="sb_month")
     
     current_month_slots = slots_df[(slots_df['year_month'] == target_month_sched) & (slots_df['status'] == "未割り当て")].copy()
     
