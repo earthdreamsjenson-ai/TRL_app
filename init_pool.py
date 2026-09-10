@@ -3,6 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import itertools
 
+
 # 🔗 スプレッドシートのURL（ID組み込み済み）
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1p34mv6TbY0z_P0iGCWEP-fJ9TYtPUObtvNYWcK-sXKs/edit?usp=sharing"
 
